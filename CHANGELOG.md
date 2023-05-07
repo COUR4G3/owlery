@@ -9,3 +9,7 @@ This project uses [towncrier](https://towncrier.readthedocs.io/) and the changes
 in the ``changelog.d/`` folder.
 
 <!-- towncrier release notes start -->
+
+## [0.1.0](https://github.com/COUR4G3/owlery/tree/0.1.0) - 2023-05-07
+
+- Initial release.
