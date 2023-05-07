@@ -25,8 +25,8 @@ owlery = "owlery.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/COUR4G3/owlery/"
-Documentation = "https://owlery.readthedocs.io/"
-Changes = "https://owlery.readthedocs.io/en/latest/changelog.html"
+Documentation = "https://owlery-messaging.readthedocs.io/"
+Changes = "https://owlery-messaging.readthedocs.io/en/latest/changelog.html"
 "Source Code" = "https://github.com/COUR4G3/owlery/"
 "Issue Tracker" = "https://github.com/COUR4G3/owlery/issues/"
 Donate = "https://ko-fi.com/cour4g3"

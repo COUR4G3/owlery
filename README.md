@@ -8,8 +8,8 @@ evolution - even sending different messages through different vendors based on r
 
 ## Links
 
-- Documentation: <https://owlery.readthedocs.io/>
-- Changes: <https://owlery.readthedocs.io/en/latest/changes.html>
+- Documentation: <https://owlery-messaging.readthedocs.io/>
+- Changes: <https://owlery-messaging.readthedocs.io/en/latest/changes.html>
 - Releases: <https://pypi.org/project/owlery/>
 - Source Code: <https://github.com/COUR4G3/owlery>
 - Issue Tracker: <https://github.com/COUR4G3/owlery/issues>
