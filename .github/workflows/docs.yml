@@ -1,6 +1,7 @@
 name: Check documentation
 on:
-- pull_request
+  pull_request:
+  workflow_call:
 
 jobs:
   docs:
