@@ -1,0 +1,16 @@
+include CHANGELOG.md
+include CONTRIBUTING.md
+include LICENSE
+include README.md
+include tox.ini
+include owlery/_version.py
+include owlery/py.typed
+
+graft artwork
+graft docs
+graft tests
+
+prune docs/_build
+
+global-exclude __pycache__
+global-exclude *.py[co]

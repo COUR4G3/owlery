@@ -1,0 +1,6 @@
+blinker~=1.6.2
+boto3~=1.26.121
+flask~=2.3.1
+phonenumbers~=8.13.11
+requests~=2.28.2
+twilio~=8.1.0

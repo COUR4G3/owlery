@@ -1,0 +1,35 @@
+version: "3.6"
+services:
+  docs:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: docs
+    ports:
+       - 8000:8000
+    volumes:
+      - ./:/opt/owlery
+    restart: unless-stopped
+  imap:
+    image: dovecot/dovecot:latest
+    ports:
+      - 143:143
+      - 993:993
+    volumes:
+      - ./dovecot.conf:/etc/dovecot/dovecot.conf:ro
+    restart: unless-stopped
+  pop3:
+    image: dovecot/dovecot:latest
+    ports:
+      - 110:110
+      - 995:995
+    volumes:
+      - ./dovecot.conf:/etc/dovecot/dovecot.conf:ro
+    restart: unless-stopped
+  smtp:
+    image: mailhog/mailhog:latest
+    ports:
+      - 25:1025
+      - 1025:1025
+      - 8025:8025
+    restart: unless-stopped

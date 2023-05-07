@@ -1,0 +1,14 @@
+node_modules/
+.mypy_cache/
+.venv/
+.vscode/
+**/*.pyc
+htmlcov
+dist/
+.eggs/
+muclh.egg-info/
+**/__pycache__/*
+.pytest_cache/
+.tox/
+.dockerenv
+.env

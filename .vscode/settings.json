@@ -1,0 +1,21 @@
+{
+    "python.linting.banditArgs": [
+        "-r",
+        "-c",
+        "${workspaceFolder/pyproject.toml"
+    ],
+    "python.linting.mypyArgs": [
+    ],
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=79"
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        },
+    },
+    "git.ignoreLimitWarning": true
+}
