@@ -60,6 +60,7 @@ You can alternatively, `fluently <https://en.wikipedia.org/wiki/Fluent_interface
 The full interface of the :class:`EmailMessageBuilder <owlery.services.email.EmailMessageBuilder>`:
 
 .. autoclass:: owlery.services.email.EmailMessageBuilder
+   :exclude-members: attach
    :members:
 
 
