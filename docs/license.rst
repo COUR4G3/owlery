@@ -13,12 +13,4 @@ code, the examples and tests, as well as the documentation.
     .. include:: ../LICENSE
 
 
-Artwork License
----------------
-
-This license applies to the Hacksaw logo and associated branding.
-
-    .. include:: ../artwork/LICENSE
-
-
 .. _MIT: https://opensource.org/license/mit/
