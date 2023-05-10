@@ -1,7 +1,7 @@
 import smtplib
 import typing as t
 
-from ...exceptions import ServiceConnectError, ServiceTimeoutError
+from ...exceptions import ServiceAuthFailed, ServiceConnectError
 from . import Email
 
 if t.TYPE_CHECKING:
@@ -56,16 +56,19 @@ class SMTP(Email):
     def open(self):
         try:
             self.session.connect(self.host, self.port)
-        except TimeoutError as e:
-            raise ServiceTimeoutError(e)
-        except ConnectionError as e:
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected) as e:
             raise ServiceConnectError(e)
 
         if self.starttls:
             self.session.starttls(context=self.ssl_context)
 
         if self.user:
-            self.session.login(self.user, self.password or "")
+            try:
+                self.session.login(self.user, self.password or "")
+            except smtplib.SMTPAuthenticationError as e:
+                if "[AUTHENTICATIONFAILED]" in str(e):
+                    raise ServiceAuthFailed(e)
+                raise
 
     @property
     def port(self) -> int:

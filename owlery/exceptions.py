@@ -68,6 +68,8 @@ class ServiceNotRegistered(OwleryException):
     """Service not registered on a service manager."""
 
     def __init__(self, name: t.Optional[str] = None):
+        self.name = name
+
         if name:
             description = f"Service '{name}' not registered on this manager"
         else:
@@ -80,6 +82,8 @@ class ServiceReceiveCapabilityError(OwleryException):
     """Service cannot receive messages."""
 
     def __init__(self, name: t.Optional[str] = None):
+        self.name = name
+
         if name:
             description = f"Service '{name}' cannot receive messages"
         else:
@@ -92,6 +96,8 @@ class ServiceSendCapabilityError(OwleryException):
     """Service cannot send messages."""
 
     def __init__(self, name: t.Optional[str] = None):
+        self.name = name
+
         if name:
             description = f"Service '{name}' cannot send messages"
         else:

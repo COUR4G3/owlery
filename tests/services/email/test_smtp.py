@@ -1,5 +1,6 @@
 import pytest
 
+from owlery.exceptions import ServiceAuthFailed
 from owlery.services.email.smtp import SMTP
 
 
@@ -15,12 +16,14 @@ def message():
 
 @pytest.fixture(scope="session")
 def smtp():
-    return SMTP(host="localhost")
+    return SMTP(host="localhost", user="test", password="test")
 
 
 @pytest.fixture
 def manager_with_smtp(manager):
-    return manager.register(SMTP, host="localhost")
+    return manager.register(
+        SMTP, host="localhost", user="test", password="test"
+    )
 
 
 def test_init():
@@ -50,6 +53,23 @@ def test_specified_port():
 @pytest.mark.integration
 def test_connect(smtp):
     smtp.open()
+    smtp.close()
+
+
+@pytest.mark.integration
+def test_connect_noauth():
+    smtp = SMTP(host="localhost")
+
+    smtp.open()
+    smtp.close()
+
+
+@pytest.mark.integration
+def test_connect_wrong_credentials():
+    smtp = SMTP(host="localhost", user="wrong", password="wrong")
+
+    with pytest.raises(ServiceAuthFailed):
+        smtp.open()
     smtp.close()
 
 

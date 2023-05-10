@@ -74,7 +74,7 @@ class IMAP(Email):
             self.session.login(self.user, self.password or "")
         except imaplib.IMAP4.error as e:
             if "[AUTHENTICATIONFAILED]" in str(e):
-                raise ServiceAuthFailed()
+                raise ServiceAuthFailed(e)
             raise
 
     @property

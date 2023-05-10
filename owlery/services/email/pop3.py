@@ -72,7 +72,7 @@ class POP3(Email):
             self.session.pass_(self.password or "")
         except poplib.error_proto as e:
             if "[AUTH] Authentication failed" in str(e):
-                raise ServiceAuthFailed()
+                raise ServiceAuthFailed(e)
             raise
 
     @property

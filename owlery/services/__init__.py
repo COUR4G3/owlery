@@ -57,23 +57,14 @@ class Outbox(UserList):
 
         super().__init__()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        if exc_type:
-            self.discard()
-        else:
-            self.release()
-
     def discard(self):
         """Discard all messages."""
         self.data.clear()
 
     def release(self):
         """Release messages to be sent, unless :data:``suppress`` is set."""
-        if self.suppress:
-            self.data.clear()
+        # if self.suppress:
+        #     self.data.clear()
 
         with on_before_send.muted():
             while self.data:
@@ -248,16 +239,21 @@ class Service:
         def capture(this, kwargs):
             outbox.append((this, kwargs))
 
-        on_before_send.connect(capture, self)
+        on_before_send.connect(capture)
 
         original_suppress = self.suppress
         self.suppress = True
 
         try:
             yield outbox
+        except Exception:
+            outbox.discard()
+            raise
         finally:
-            on_before_send.disconnect(capture, self)
+            on_before_send.disconnect(capture)
             self.suppress = original_suppress
+
+        outbox.release()
 
     def receive(
         self,
@@ -337,7 +333,7 @@ class ServiceManager(Service):
                 try:
                     service = self.services[via]
                 except KeyError:
-                    raise RuntimeError(f"No service '{via}' registered")
+                    raise ServiceNotRegistered(via)
                 else:
                     services.append(service)
             else:
@@ -346,11 +342,14 @@ class ServiceManager(Service):
                 services = list(
                     s for s in self.services.values() if s.can_receive
                 )
-                services = random.shuffle(services)
+                random.shuffle(services)
+
+            if not services:
+                raise ServiceReceiveCapabilityError()
 
             for service in services:
                 for message in service.receive(limit=limit, **kwargs):
-                    on_receive_message(self, message=message)
+                    on_receive_message.send(self, message=message)
                     yield message
                     limit -= 1
 
@@ -372,7 +371,7 @@ class ServiceManager(Service):
                 try:
                     service = self.services[via]
                 except KeyError:
-                    raise RuntimeError(f"No service '{via}' registered")
+                    raise ServiceNotRegistered(via)
 
             if not service:
                 try:
@@ -380,9 +379,9 @@ class ServiceManager(Service):
                         s for s in self.services.values() if s.can_send
                     )[0]
                 except IndexError:
-                    raise RuntimeError("No sending services registered")
+                    raise ServiceSendCapabilityError()
 
-            on_before_send.send(self, kwargs=kwargs)
+            on_before_send.send(service, kwargs=kwargs)
 
             if self.suppress:
                 return
