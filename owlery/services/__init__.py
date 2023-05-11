@@ -3,7 +3,7 @@ import platform
 import random
 import typing as t
 
-from collections import UserList
+from collections import UserDict, UserList
 from contextlib import contextmanager
 
 from .. import __version__
@@ -42,7 +42,47 @@ class Attachment:
 
 @dataclasses.dataclass
 class Message:
-    """A representation for a received messages."""
+    """A representation for a received messages.
+
+    :param id: The message unique identifier.
+    :param reply_id: The message identifier this message is replied to.
+    :param raw: The raw data response from service.
+    :param service: Service to use for sending, replies and fowarding.
+
+    """
+
+    id: t.Optional[str] = None
+    reply_id: t.Optional[str] = None
+    raw: t.Any = None
+    service: t.Optional["Service"] = None
+
+    def send(self, service=None):
+        if not service:
+            service = self.service
+        if not service:
+            raise ValueError("No service to send this message")
+
+        return service.send_message(self)
+
+
+class MessageBuilder(UserDict):
+    def __init__(self, dict=None, service=None, **kwargs):
+        self.service = service
+
+        super().__init__(dict, **kwargs)
+
+    def _replace(self, **kwargs):
+        message = self.copy()
+        message.update(**kwargs)
+
+        return message
+
+    def send(self):
+        service = self.service
+        if not service:
+            raise ValueError("No service to send this message")
+
+        return service.send(**self.data)
 
 
 class Outbox(UserList):
@@ -285,6 +325,14 @@ class Service:
         """
         name = self.__class__.__name__
         raise ServiceSendCapabilityError(name=name)
+
+    def send_message(self, message: Message):
+        """Send a message from a message object.
+
+        :param message: A :class:`Message` message object.
+
+        """
+        return message.send(service=self)
 
     @contextmanager
     def suppressed(self):
