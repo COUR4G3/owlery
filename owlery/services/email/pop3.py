@@ -25,6 +25,10 @@ class POP3(Email):
 
     """
 
+    name = "pop3"
+
+    can_receive = True
+
     def __init__(
         self,
         host: str = "localhost",

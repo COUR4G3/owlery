@@ -81,3 +81,34 @@ detailed information on the inner workings.
             print("Received message using '%s': %s", sender.name, message)
 
         on_receive_message.connect(print_message_received)
+
+
+.. data:: on_receive_status_callback
+
+    This signal is sent when a message status callback is received. The signal is invoked with the service as
+    ``sender``, message identifier as ``message_id``, the status as ``status`` and the raw request data as ``raw``.
+
+    Available statuses are:
+
+    * ``'pending'`` - message has not yet been sent.
+    * ``'error'`` - an error occured sending the message.
+    * ``'sent'`` - message has been sent.
+    * ``'received'`` - message has been received.
+    * ``'read'`` - message has been read.
+    * ``'unknown'`` - service returned an unknown state, interogate the ``raw`` data.
+
+    Services may support none, some or all of these statuses.
+
+    Example subscriber::
+
+        from owlery.signals import on_receive_status_callback
+
+        def print_receive_status_callback(sender, message_id, status):
+            print(
+                "Received message statis callback using '%s': %s, %s",
+                sender.name,
+                message,
+                status,
+            )
+
+        on_receive_status_callback.connect(print_receive_status_callback)

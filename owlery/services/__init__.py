@@ -20,6 +20,9 @@ from ..signals import (
     on_close_session,
     on_open_session,
     on_receive_message,
+    on_receive_status_callback,
+    on_register_service,
+    on_unregister_service,
 )
 
 USER_AGENT = (
@@ -128,18 +131,30 @@ class Service:
         self.suppress = suppress
         """Suppress sending of messages."""
 
+        self._media_helper = None
+
         self._wrap_methods()
+
+        self.logger = logging.getLogger(__name__)
+
+    def _on_receive_message(self, message):
+        on_receive_message.send(self, message=message)
+
+        self.logger.debug("Received message:\n%r", message)
 
     def _wrap_close(self):
         # wrap the close method:
         # - dispatch the `on_session_close` signals.
         # - unset the ``opened`` flag.
+        # - log a message.
         original_close = self.close
 
         def close(self):
             original_close()
 
             on_close_session.send(self)
+
+            self.logger.debug("Closed session")
 
             self.opened = False
 
@@ -157,6 +172,7 @@ class Service:
         # wrap the open method:
         # - dispatch `on_session_open` signals.
         # - set the ``opened`` flag.
+        # - log a message.
 
         original_open = self.open
 
@@ -164,6 +180,8 @@ class Service:
             original_open()
 
             on_open_session.send(self)
+
+            self.logger.debug("Opened session")
 
             self.opened = True
 
@@ -174,6 +192,7 @@ class Service:
         # wrap the receive method:
         # - dispatch `on_receive_message` signals.
         # - open the connection or session if ``opened`` flag not set.
+        # - log messages.
 
         original_receive = self.receive
 
@@ -181,10 +200,14 @@ class Service:
             if not self.opened:
                 self.open()
 
+            count = 0
             for message in original_receive(**kwargs):
-                on_receive_message.send(self, message=message)
+                self._on_receive_message(message)
 
                 yield message
+                count += 1
+
+            self.logger.info("Received %d messages", count)
 
         self.receive = receive.__get__(self, Service)
         self._receive = original_receive
@@ -194,6 +217,7 @@ class Service:
         # - dispatch ``on_before_send`` and ``on_after_send`` signals.
         # - open the connection or session if ``opened`` flag not set.
         # - silently discard the message if ``suppress`` flag is set.
+        # - log messages.
 
         original_send = self.send
 
@@ -524,11 +548,17 @@ class ServiceManager(Service):
                            initialisation.
 
         """
+        if not name:
+            name = service_cls.name
         if name in self.services and not overwrite:
             raise KeyError(f"Service '{name}' already exists")
 
         service = service_cls(*args, **kwargs)
         self.services[name] = service
+
+        on_register_service.send(self, service=service)
+
+        self.logger.info("Registered a service: %s", service.name)
 
         return service
 
@@ -558,7 +588,11 @@ class ServiceManager(Service):
                     return
                 raise KeyError(f"Service '{service!r}' does not exist")
 
-            return self.services.pop(name)
+            service = self.services.pop(name)
+
+        on_unregister_service.send(self, service=service)
+
+        self.logger.info("Unregistered a service: %s", service.name)
 
     def via(
         self,

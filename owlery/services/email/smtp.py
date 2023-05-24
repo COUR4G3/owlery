@@ -23,6 +23,8 @@ class SMTP(Email):
 
     name = "smtp"
 
+    can_send = True
+
     def __init__(
         self,
         host: str = "localhost",

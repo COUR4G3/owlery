@@ -1,7 +1,7 @@
 import logging
 import typing as t
 
-from . import Service
+from . import Message, Service
 
 
 class Logger(Service):
@@ -25,7 +25,7 @@ class Logger(Service):
         message: str = "Message sent %s",
         **kwargs,
     ):
-        self.logger = logging.getLogger(logger)
+        self.message_logger = logging.getLogger(logger)
         self.level = level
         self.message = message
 
@@ -34,7 +34,9 @@ class Logger(Service):
         self.suppress = False
 
     def send(self, **kwargs):
-        self.logger.log(self.level, self.message, kwargs, extra=kwargs)
+        self.message_logger.log(self.level, self.message, kwargs, extra=kwargs)
+
+        return Message(raw=kwargs)
 
 
 class Null(Service):
@@ -44,7 +46,7 @@ class Null(Service):
     can_send = True
 
     def send(self, **kwargs):
-        return
+        return Message()
 
 
 class ReceiveFunction(Service):
