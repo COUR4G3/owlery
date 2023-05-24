@@ -5,10 +5,11 @@ from owlery.exceptions import (
     ServiceReceiveCapabilityError,
     ServiceSendCapabilityError,
 )
-from owlery.services import Service, ServiceManager
+from owlery.services import Message, Service, ServiceManager
 
 
 class ServiceTest(Service):
+    name = "test"
     can_send = True
 
     def __init__(self):
@@ -21,6 +22,7 @@ class ServiceTest(Service):
 
 
 class ServiceTestReceive(Service):
+    name = "test_receive"
     can_receive = True
 
     def __init__(self, message):
@@ -28,7 +30,7 @@ class ServiceTestReceive(Service):
         super().__init__()
 
     def receive(self, **kwargs):
-        yield self.message
+        yield Message(raw=self.message)
 
 
 @pytest.fixture
@@ -37,11 +39,11 @@ def manager():
 
 
 def test_close(manager):
-    service1 = manager.register(Service, name="service1")
+    service1 = manager.register(ServiceTest, name="service1")
     service1.open()
     assert service1.opened is True
 
-    service2 = manager.register(Service, name="service2")
+    service2 = manager.register(ServiceTest, name="service2")
     service2.open()
     assert service2.opened is True
 
@@ -213,10 +215,10 @@ def test_receive_via(manager):
     assert len(manager.services) == 2
 
     for message in manager.receive(via="service1"):
-        assert message == 1
+        assert message.raw == 1
 
     for message in manager.receive(via="service2"):
-        assert message == 2
+        assert message.raw == 2
 
 
 def test_receive_via_missing(manager):

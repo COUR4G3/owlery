@@ -26,7 +26,7 @@ def test_on_after_send(service, message):
         service.send(**message)
 
         assert captured[0][0] is service
-        assert captured[0][1] == message
+        assert captured[0][1].raw is None
 
 
 def test_on_before_send(service, message):

@@ -23,26 +23,18 @@ def test_logger(caplog):
     assert caplog.records[0].foo == "bar"
 
 
-def test_null(mocker):
+def test_null():
     service = Null()
 
-    spy = mocker.spy(service, "send")
-
-    service.send(foo="bar")
-
-    assert spy.call_count == 1
-    assert spy.spy_return is None
+    message = service.send(foo="bar")
+    assert message.raw is None
 
 
-def test_null_with_manager(manager, mocker):
+def test_null_with_manager(manager):
     manager.register(Null)
 
-    spy = mocker.spy(manager, "send")
-
-    manager.send(foo="bar")
-
-    assert spy.call_count == 1
-    assert spy.spy_return is None
+    message = manager.send(foo="bar")
+    assert message.raw is None
 
 
 def test_receive_function(mocker):

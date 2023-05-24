@@ -1,7 +1,9 @@
 import dataclasses
+import logging
 import platform
 import random
 import typing as t
+import uuid
 
 from collections import UserDict, UserList
 from contextlib import contextmanager
@@ -274,7 +276,7 @@ class Service:
             # nothing is sent
 
         """
-        outbox = Outbox(suppress=self.suppress)
+        outbox = Outbox(self, suppress=self.suppress)
 
         def capture(this, kwargs):
             outbox.append((this, kwargs))
@@ -397,6 +399,9 @@ class ServiceManager(Service):
 
             for service in services:
                 for message in service.receive(limit=limit, **kwargs):
+                    # if service cannot send replies, set to manager
+                    if not service.can_send:
+                        message.service = self
                     on_receive_message.send(self, message=message)
                     yield message
                     limit -= 1
@@ -537,7 +542,7 @@ class ServiceManager(Service):
         """
         if isinstance(service, str):
             try:
-                return self.services.pop(service)
+                service = self.services.pop(service)
             except KeyError:
                 if ignore_missing:
                     return
