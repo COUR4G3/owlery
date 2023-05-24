@@ -62,6 +62,10 @@ jobs:
           python -m pip install tox-gh-actions
       - name: Setup test suite
         run: tox r -e py${{ matrix.python }} -vv --notest
+      - name: Download code coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage
       - name: Run test suite
         run: tox r -e py${{ matrix.python }} --skip-pkg-install
       - name: Store code coverage
