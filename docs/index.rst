@@ -19,6 +19,7 @@ evolution - even sending different messages through different vendors based on r
    :maxdepth: 2
 
    services/index
+   integrations/index
 
 
 .. toctree::
