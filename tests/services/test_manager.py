@@ -195,7 +195,7 @@ def test_register_overwrite(manager):
 
 def test_receive_no_service(manager):
     with pytest.raises(ServiceReceiveCapabilityError):
-        for message in manager.receive():
+        for _ in manager.receive():
             pass
 
 
@@ -203,7 +203,7 @@ def test_receive_no_send_service(manager):
     manager.register(ServiceTest)
 
     with pytest.raises(ServiceReceiveCapabilityError):
-        for message in manager.receive():
+        for _ in manager.receive():
             pass
 
 
@@ -223,7 +223,7 @@ def test_receive_via(manager):
 
 def test_receive_via_missing(manager):
     with pytest.raises(ServiceNotRegistered) as e:
-        for message in manager.receive(via="test"):
+        for _ in manager.receive(via="test"):
             pass
     assert e.value.name == "test"
 

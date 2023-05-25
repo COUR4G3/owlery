@@ -28,7 +28,7 @@ def test_suppress():
 def test_receive_not_capable():
     service = Service()
     with pytest.raises(ServiceReceiveCapabilityError):
-        for message in service.receive():
+        for _ in service.receive():
             pass
 
 
