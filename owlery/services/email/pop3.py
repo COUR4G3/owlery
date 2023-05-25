@@ -6,7 +6,7 @@ from ...exceptions import (
     ServiceConnectError,
     ServiceTimeoutError,
 )
-from . import Email
+from . import Email, EmailMessage
 
 if t.TYPE_CHECKING:
     import ssl
@@ -96,4 +96,4 @@ class POP3(Email):
 
         for i in range(1, min(count, limit) + 1):
             res, data, octets = self.session.retr(i)
-            yield data
+            yield EmailMessage.from_bytes(b"\r\n".join(data))

@@ -3,6 +3,12 @@ import datetime as dt
 import typing as t
 
 from collections import UserDict
+from email import (
+    message_from_binary_file,
+    message_from_bytes,
+    message_from_file,
+    message_from_string,
+)
 from email.message import EmailMessage as PyEmailMessage
 from email.utils import format_datetime, make_msgid
 
@@ -26,7 +32,7 @@ class EmailAttachment(Attachment):
     filename: t.Optional[str] = None
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(kw_only=True)
 class EmailMessage(Message):
     """A representation for a received email message.
 
@@ -42,13 +48,15 @@ class EmailMessage(Message):
     :param from\\_: The from address of the email message.
     :param attachments: A list of attachments.
     :param headers: A list of additional messages headers.
+    :param encrypted: Email message is encrypted with GPG, PGP or S/MIME
+    :param verified: Email message integrity has been verified.
     :param service: Service to use for sending, reply etc.
 
     """
 
-    to: AddressesType
-    subject: str
-    body: str
+    to: t.Optional[AddressesType]
+    subject: t.Optional[str]
+    body: t.Optional[str]
     html_body: t.Optional[str] = None
     amp_html_body: t.Optional[str] = None
     cc: AddressesType = dataclasses.field(default_factory=list)
@@ -59,6 +67,7 @@ class EmailMessage(Message):
         default_factory=list,
     )
     headers: t.Dict[str, str] = dataclasses.field(default_factory=dict)
+    raw: t.Optional[bytes] = None
     service: t.Optional["Email"] = None
 
     @classmethod
@@ -88,6 +97,46 @@ class EmailMessage(Message):
         body = self.body
 
         service.send(to, body, attachments=self.attachments, **kwargs)
+
+    @classmethod
+    def from_binary_file(cls, fp: t.IO[bytes]):
+        msg = message_from_binary_file(fp)
+        return cls.from_email_message(msg)  # type: ignore
+
+    @classmethod
+    def from_bytes(cls, s: bytes):
+        msg = message_from_bytes(s)
+        return cls.from_email_message(msg)  # type: ignore
+
+    @classmethod
+    def from_email_message(cls, message: PyEmailMessage):
+        subject = message.get("Subject", "")
+        body = message.get_body(("plain",))
+        html_body = message.get_body(("html",))
+        headers = dict(message.items())
+
+        return cls(
+            to=to,
+            subject=subject,
+            body=body,
+            html_body=html_body,
+            cc=cc,
+            bcc=bcc,
+            reply_to=reply_to,
+            from_=from_,
+            headers=headers,
+            raw=message,
+        )
+
+    @classmethod
+    def from_file(cls, fp: t.IO[str]):
+        msg = message_from_file(fp)
+        return cls.from_email_message(msg)  # type: ignore
+
+    @classmethod
+    def from_string(cls, s: str):
+        msg = message_from_string(s)
+        return cls.from_email_message(msg)  # type: ignore
 
     def reply(
         self,

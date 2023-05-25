@@ -6,7 +6,7 @@ from ...exceptions import (
     ServiceConnectError,
     ServiceTimeoutError,
 )
-from . import Email
+from . import Email, EmailMessage
 
 if t.TYPE_CHECKING:
     import ssl
@@ -94,6 +94,6 @@ class IMAP(Email):
         res, data = self.session.search("UTF-8", "UNSEEN")
         for num in data[0].split():
             res, data = self.session.fetch(num, "(RFC822)")
-            yield data[0][1]
+            yield EmailMessage.from_bytes(data[0][1])
 
         self.session.close()
