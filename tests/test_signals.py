@@ -1,6 +1,7 @@
 import pytest
 
 from owlery import signals
+from owlery.services import Message
 from owlery.services.misc import Null, ReceiveFunction
 
 
@@ -74,7 +75,7 @@ def test_on_receive_message(message):
         captured.append((service, message))
 
     def receive(**kwargs):
-        return [message]
+        return [Message(raw=message)]
 
     service = ReceiveFunction(receive)
 
@@ -83,4 +84,4 @@ def test_on_receive_message(message):
             pass
 
         assert captured[0][0] is service
-        assert captured[0][1] == message
+        assert captured[0][1].raw == message

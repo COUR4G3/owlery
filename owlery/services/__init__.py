@@ -4,7 +4,6 @@ import logging
 import platform
 import random
 import typing as t
-import uuid
 
 from collections import UserDict, UserList
 from contextlib import contextmanager
