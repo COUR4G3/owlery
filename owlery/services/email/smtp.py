@@ -88,4 +88,13 @@ class SMTP(Email):
 
     def send(self, **kwargs):
         message = EmailMessage(**kwargs)
-        return self.session.send_message(message.as_email_message())
+
+        try:
+            self.session.send_message(message.as_email_message())
+        except smtplib.SMTPException as e:
+            message.exc = e
+            message.status = "error"
+        else:
+            message.status = "sent"
+
+        return message

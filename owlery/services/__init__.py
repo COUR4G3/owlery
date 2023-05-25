@@ -75,6 +75,8 @@ class Message:
     reply_id: t.Optional[str] = None
     date: t.Optional[dt.datetime] = None
     raw: t.Any = None
+    status: MessageStatus = "draft"
+    exc: t.Optional[Exception] = None
     service: t.Optional["Service"] = None
 
     def as_dict(self):
@@ -116,30 +118,48 @@ class Outbox(UserList):
 
     """
 
-    def __init__(self, suppress=False):
+    def __init__(self, service, suppress=False):
+        self.service = service
         self.suppress = suppress
 
         super().__init__()
 
+    def append(self, item):
+        super().append(item)
+
+        self.service.logger.debug("Enqueued a message in outbox:\n%r", item)
+
+    def clear(self):
+        count = len(self.data)
+
+        super().clear()
+
+        self.service.logger.debug("Discarded %d messages from outbox", count)
+
     def discard(self):
         """Discard all messages."""
-        self.data.clear()
+        self.clear()
 
     def release(self):
         """Release messages to be sent, unless :data:``suppress`` is set."""
         # if self.suppress:
         #     self.data.clear()
 
+        count = len(self.data)
+
         with on_before_send.muted():
             while self.data:
                 service, message = self.data.pop()
                 service.send(**message)
+
+        self.service.logger.debug("Released %d messages from outbox", count)
 
 
 class Service:
     """Base class for all services."""
 
     name: str
+
     can_receive: bool = False
     can_send: bool = False
 
@@ -157,6 +177,8 @@ class Service:
         self.logger = logging.getLogger(__name__)
 
     def _on_receive_message(self, message):
+        message.status = "received"
+
         on_receive_message.send(self, message=message)
 
         self.logger.debug("Received message:\n%r", message)
