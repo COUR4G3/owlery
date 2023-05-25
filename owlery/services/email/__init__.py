@@ -10,7 +10,7 @@ from email import (
     message_from_string,
 )
 from email.message import EmailMessage as PyEmailMessage
-from email.utils import format_datetime, make_msgid
+from email.utils import format_datetime, make_msgid, parseaddr
 
 from .. import USER_AGENT, Attachment, Message, Service, ServiceManager
 
@@ -67,7 +67,7 @@ class EmailMessage(Message):
         default_factory=list,
     )
     headers: t.Dict[str, str] = dataclasses.field(default_factory=dict)
-    raw: t.Optional[bytes] = None
+    raw: t.Any = None
     service: t.Optional["Email"] = None
 
     @classmethod
@@ -110,18 +110,21 @@ class EmailMessage(Message):
 
     @classmethod
     def from_email_message(cls, message: PyEmailMessage):
+        to = [parseaddr(t.strip()) for t in message.get("To", "").split(",")]
+        from_ = parseaddr(message.get("From", ""))
         subject = message.get("Subject", "")
         body = message.get_body(("plain",))
         html_body = message.get_body(("html",))
+        cc = [parseaddr(c.strip()) for c in message.get("Cc", "").split(",")]
+        reply_to = parseaddr(message.get("Reply-To", ""))
         headers = dict(message.items())
 
         return cls(
             to=to,
             subject=subject,
-            body=body,
-            html_body=html_body,
+            body=body and body.get_payload() or "",
+            html_body=html_body and html_body.get_payload() or None,
             cc=cc,
-            bcc=bcc,
             reply_to=reply_to,
             from_=from_,
             headers=headers,
