@@ -16,13 +16,16 @@ def message():
 
 @pytest.fixture(scope="session")
 def smtp():
-    return SMTP(host="localhost", user="test", password="test")
+    return SMTP(host="localhost", port=25, user="test", password="test")
 
 
 @pytest.fixture
 def manager_with_smtp(manager):
     return manager.register(
-        SMTP, host="localhost", user="test", password="test"
+        SMTP,
+        host="localhost",
+        user="test",
+        password="test",
     )
 
 
@@ -57,8 +60,36 @@ def test_connect(smtp):
 
 
 @pytest.mark.integration
-def test_connect_noauth():
-    smtp = SMTP(host="localhost")
+def test_connect_ssl():
+    smtp = SMTP(
+        host="localhost",
+        port=465,
+        ssl=True,
+        user="user",
+        password="pass",
+    )
+
+    smtp.open()
+    smtp.close()
+
+
+@pytest.mark.integration
+def test_connect_starttls():
+    smtp = SMTP(
+        host="localhost",
+        port=587,
+        starttls=True,
+        user="user",
+        password="pass",
+    )
+
+    smtp.open()
+    smtp.close()
+
+
+@pytest.mark.integration
+def test_connect_auth():
+    smtp = SMTP(host="localhost", port=587, user="user", password="pass")
 
     smtp.open()
     smtp.close()
@@ -66,7 +97,7 @@ def test_connect_noauth():
 
 @pytest.mark.integration
 def test_connect_wrong_credentials():
-    smtp = SMTP(host="localhost", user="wrong", password="wrong")
+    smtp = SMTP(host="localhost", port=587, user="wrong", password="wrong")
 
     with pytest.raises(ServiceAuthFailed):
         smtp.open()

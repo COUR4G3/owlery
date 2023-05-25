@@ -50,6 +50,9 @@ class SMTP(Email):
         else:
             self.session = smtplib.SMTP()
 
+        # this is required for ssl support
+        self.session._host = host  # type: ignore
+
         super().__init__(**kwargs)
 
     def close(self):
@@ -68,9 +71,7 @@ class SMTP(Email):
             try:
                 self.session.login(self.user, self.password or "")
             except smtplib.SMTPAuthenticationError as e:
-                if "[AUTHENTICATIONFAILED]" in str(e):
-                    raise ServiceAuthFailed(e)
-                raise
+                raise ServiceAuthFailed(e)
 
     @property
     def port(self) -> int:
