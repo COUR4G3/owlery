@@ -1,4 +1,5 @@
 import dataclasses
+import datetime as dt
 import logging
 import platform
 import random
@@ -45,21 +46,39 @@ class Attachment:
     mimetype: str = "application/octet-stream"
 
 
-@dataclasses.dataclass
+MessageStatus = t.Literal[
+    "draft",
+    "queued",
+    "sent",
+    "received",
+    "read",
+    "cancelled",
+    "error",
+]
+
+
+@dataclasses.dataclass(kw_only=True)
 class Message:
     """A representation for a received messages.
 
     :param id: The message unique identifier.
     :param reply_id: The message identifier this message is replied to.
+    :param date: The date the message was sent/received.
     :param raw: The raw data response from service.
+    :param status: The message status.
+    :param exc: The exception object if an error occured.
     :param service: Service to use for sending, replies and fowarding.
 
     """
 
     id: t.Optional[str] = None
     reply_id: t.Optional[str] = None
+    date: t.Optional[dt.datetime] = None
     raw: t.Any = None
     service: t.Optional["Service"] = None
+
+    def as_dict(self):
+        return dataclasses.asdict(self)
 
     def send(self, service=None):
         if not service:

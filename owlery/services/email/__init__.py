@@ -10,7 +10,12 @@ from email import (
     message_from_string,
 )
 from email.message import EmailMessage as PyEmailMessage
-from email.utils import format_datetime, make_msgid, parseaddr
+from email.utils import (
+    format_datetime,
+    make_msgid,
+    parseaddr,
+    parsedate_to_datetime,
+)
 
 from .. import USER_AGENT, Attachment, Message, Service, ServiceManager
 
@@ -70,6 +75,56 @@ class EmailMessage(Message):
     raw: t.Any = None
     service: t.Optional["Email"] = None
 
+    def as_bytes(self):
+        message = self.as_email_message()
+        return message.as_bytes()
+
+    def as_email_message(self):
+        message = PyEmailMessage()
+
+        if not self.date:
+            date = dt.datetime.now()
+        message["Date"] = format_datetime(date)
+
+        if not self.id:
+            self.id = make_msgid()
+        message["Message-ID"] = self.id
+
+        if self.from_:
+            message["From"] = self.from_
+
+        if self.to:
+            message["To"] = self.to
+
+        if self.cc:
+            message["Cc"] = self.cc
+
+        if self.reply_to:
+            message["Reply-To"] = self.reply_to
+
+        if self.subject:
+            message["Subject"] = self.subject
+
+        message.set_content(self.body, subtype="plain")
+
+        if self.amp_html_body:
+            message.add_alternative(self.amp_html_body, subtype="x-amp-html")
+
+        if self.html_body:
+            message.add_alternative(self.html_body, subtype="html")
+
+        message["User-Agent"] = message["X-Mailer"] = USER_AGENT
+
+        if self.headers:
+            for name, value in self.headers.items():
+                message[name] = value
+
+        return message
+
+    def as_string(self):
+        message = self.as_email_message()
+        return message.as_string()
+
     @classmethod
     def build(self, **kwargs):
         return EmailMessageBuilder(**kwargs)
@@ -117,6 +172,9 @@ class EmailMessage(Message):
         html_body = message.get_body(("html",))
         cc = [parseaddr(c.strip()) for c in message.get("Cc", "").split(",")]
         reply_to = parseaddr(message.get("Reply-To", ""))
+        date = message.get("Date", None)
+        if date:
+            date = parsedate_to_datetime(date)
         headers = dict(message.items())
 
         return cls(
@@ -128,6 +186,7 @@ class EmailMessage(Message):
             reply_to=reply_to,
             from_=from_,
             headers=headers,
+            date=date,
             raw=message,
         )
 
@@ -243,6 +302,9 @@ class EmailMessageBuilder(UserDict):
             return self.data["amp_html_body"]
 
         return self.replace(amp_html_body=amp_html_body)
+
+    def as_message(self):
+        return EmailMessage(**self.data)
 
     def attach(
         self,

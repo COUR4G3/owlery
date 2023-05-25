@@ -2,7 +2,7 @@ import smtplib
 import typing as t
 
 from ...exceptions import ServiceAuthFailed, ServiceConnectError
-from . import Email
+from . import Email, EmailMessage
 
 if t.TYPE_CHECKING:
     import ssl
@@ -87,5 +87,5 @@ class SMTP(Email):
         return port
 
     def send(self, **kwargs):
-        message = self.Message(**kwargs).format_message()
-        return self.session.send_message(message)
+        message = EmailMessage(**kwargs)
+        return self.session.send_message(message.as_email_message())

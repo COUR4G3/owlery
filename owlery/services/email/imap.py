@@ -26,6 +26,10 @@ class IMAP(Email):
 
     """
 
+    name = "imap"
+
+    can_receive = True
+
     def __init__(
         self,
         host: str = "localhost",
