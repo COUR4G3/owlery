@@ -59,9 +59,9 @@ class EmailMessage(Message):
 
     """
 
-    to: t.Optional[AddressesType]
-    subject: t.Optional[str]
-    body: t.Optional[str]
+    to: AddressesType
+    subject: str
+    body: str
     html_body: t.Optional[str] = None
     amp_html_body: t.Optional[str] = None
     cc: AddressesType = dataclasses.field(default_factory=list)
@@ -502,10 +502,6 @@ class Email(Service):
 
         """
         ...
-
-    def send_message(self, message: EmailMessage):
-        """Send an email message from :class:`EmailMessage`."""
-        return self.send(**dataclasses.asdict(message))
 
 
 class EmailManager(Email, ServiceManager):

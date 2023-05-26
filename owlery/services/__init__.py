@@ -398,11 +398,13 @@ class Service:
         :param message: A :class:`Message` message object.
 
         """
-        return message.send(service=self)
+        data = message.as_dict()
+        data["service"] = self
+        return message.send(**data)
 
     @contextmanager
     def suppressed(self):
-        """suppress outgoing messages for duration of the context manager."""
+        """Suppress outgoing messages for duration of the context manager."""
         original_suppress = self.suppress
         self.suppress = True
 
