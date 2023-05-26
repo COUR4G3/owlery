@@ -162,6 +162,12 @@ class Service:
     can_receive: bool = False
     can_send: bool = False
 
+    has_receive_webhook = False
+    has_receive_webhook_methods = ["POST"]
+
+    has_status_callback = False
+    has_status_callback_methods = ["POST"]
+
     def __init__(self, suppress=False, **kwargs):
         self.opened = False
         """Whether a connection or session has been started."""
@@ -206,7 +212,9 @@ class Service:
         self._wrap_close()
         self._wrap_open()
         self._wrap_receive()
+        self._wrap_receive_webhook()
         self._wrap_send()
+        self._wrap_status_callback()
 
     def _wrap_open(self):
         # wrap the open method:
@@ -252,6 +260,26 @@ class Service:
         self.receive = receive.__get__(self, Service)
         self._receive = original_receive
 
+    def _wrap_receive_webhook(self):
+        # wrap the receive_webhook method:
+        # - dispatch `on_receive_message` signals.
+        # - log messages.
+
+        original_receive = self.receive_webhook
+
+        def receive_webhook(self, request):
+            count = 0
+            for message in original_receive(request):
+                self._on_receive_message(message)
+
+                yield message
+                count += 1
+
+            self.logger.info("Received %d messages from webhook", count)
+
+        self.receive_webhook = receive_webhook.__get__(self, Service)
+        self._receive_webhook = original_receive
+
     def _wrap_send(self):
         # wrap the send method:
         # - dispatch ``on_before_send`` and ``on_after_send`` signals.
@@ -270,14 +298,44 @@ class Service:
             if not self.opened:
                 self.open()
 
-            results = original_send(**kwargs)
+            message = original_send(**kwargs)
 
-            on_after_send.send(self, message=kwargs)
+            on_after_send.send(self, message=message)
 
-            return results
+            # self.logger.info("Sent message %s", message.id)
+            # self.logger.debug("%r", message)
+
+            return message
 
         self.send = send.__get__(self, Service)
         self._send = original_send
+
+    def _wrap_status_callback(self):
+        # wrap the status_callback method:
+        # - dispatch ``on_receive_status_callback`` signals.
+        # - log messages.
+
+        original_status = self.status_callback
+
+        def status_callback(self, request):
+            message_id, status, raw = original_status(request)
+            on_receive_status_callback.send(
+                self,
+                message_id=message_id,
+                status=status,
+                raw=raw,
+            )
+
+            self.logger.info(
+                "Received message status: %s, %s",
+                message_id,
+                status,
+            )
+
+            return message_id, status, raw
+
+        self.status_callback = status_callback.__get__(self, Service)
+        self._status_callback = original_status
 
     def __enter__(self):
         if not self.opened:
@@ -381,6 +439,19 @@ class Service:
         name = self.__class__.__name__
         raise ServiceReceiveCapabilityError(name=name)
 
+    def receive_webhook(self, request):
+        """Receive messages from a webhook.
+
+        Developers SHOULD implement this method.
+
+        :param request: The request to parse.
+
+        :raises ServiceReceiveCapabilityError: Receiving not supported.
+
+        """
+        name = self.__class__.__name__
+        raise ServiceReceiveCapabilityError(name=name)
+
     def send(self, *args, **kwargs):
         """Send a message.
 
@@ -401,6 +472,18 @@ class Service:
         data = message.as_dict()
         data["service"] = self
         return message.send(**data)
+
+    def status_callback(self, request):
+        """Receive sent message status callback from a webhook.
+
+        Developers SHOULD implement this method.
+
+        :param request: The request to parse.
+
+        :raises NotImplementedError: Status callback not supported.
+
+        """
+        raise NotImplementedError()
 
     @contextmanager
     def suppressed(self):
