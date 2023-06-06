@@ -10,6 +10,24 @@ in the ``changelog.d/`` folder.
 
 <!-- towncrier release notes start -->
 
+## [Unreleased](https://github.com/COUR4G3/owlery/tree/master)
+
+
+### Features
+
+- Flask web framework integration.
+- Set message status on send, and store exception on error.
+- Support for SMS text, MMS multimedia and WhatsApp messages.
+- Support for message receiving webhooks and status callbacks.
+- Added Twilio as a provider (for SMS, MMS and WhatsApp).
+
+
+### Fixed
+
+- Various fixes to services.
+- Fixed documentation and tests.
+
+
 ## [0.1.1](https://github.com/COUR4G3/owlery/tree/0.1.1) - 2023-05-08
 
 

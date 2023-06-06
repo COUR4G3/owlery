@@ -1,17 +1,33 @@
+import imaplib
+import time
+
 import pytest
 
 from owlery.exceptions import ServiceAuthFailed
+from owlery.services.email import EmailMessage
 from owlery.services.email.pop3 import POP3
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def message():
-    return {
-        "body": "This is a test message",
-        "from_": "test@example.com",
-        "subject": "Test message",
-        "to": ["test@example.com"],
-    }
+    message = EmailMessage(
+        to=["user"],
+        subject="Test message",
+        body="This is a test message.",
+        from_="test@example.com",
+    )
+
+    with imaplib.IMAP4(host="localhost", port=143) as imap:
+        imap.login("user", "pass")
+
+        imap.append(
+            "INBOX",
+            (),
+            time.time(),
+            message.as_bytes(),
+        )
+
+    return message
 
 
 @pytest.fixture(scope="session")
@@ -107,27 +123,27 @@ def test_specified_port():
 
 @pytest.mark.integration
 def test_receive(pop3, message):
-    for _ in pop3.receive(limit=10):
-        pass
+    for received_message in pop3.receive(limit=10):
+        assert received_message == message
     pop3.close()
 
 
 @pytest.mark.integration
 def test_receive_contextmanager(pop3, message):
     with pop3:
-        for _ in pop3.receive(limit=10):
-            pass
+        for received_message in pop3.receive(limit=10):
+            assert received_message == message
 
 
 @pytest.mark.integration
 def test_receive_with_manager(manager_with_pop3, message):
-    for _ in manager_with_pop3.receive(limit=10):
-        pass
+    for received_message in manager_with_pop3.receive(limit=10):
+        assert received_message == message
     manager_with_pop3.close()
 
 
 @pytest.mark.integration
 def test_receive_with_manager_contextmanager(manager_with_pop3, message):
     with manager_with_pop3:
-        for _ in manager_with_pop3.receive(limit=10):
-            pass
+        for received_message in manager_with_pop3.receive(limit=10):
+            assert received_message == message

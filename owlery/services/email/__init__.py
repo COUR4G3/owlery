@@ -19,6 +19,13 @@ from email.utils import (
 
 from .. import USER_AGENT, Attachment, Message, Service, ServiceManager
 
+try:
+    import envelope
+except ImportError:
+    ENVELOPE_AVAILABLE = False
+else:
+    ENVELOPE_AVAILABLE = True
+
 AddressType = t.Union[str, t.Tuple[t.Optional[str], str]]
 AddressesType = t.Iterable[AddressType]
 
@@ -72,6 +79,9 @@ class EmailMessage(Message):
         default_factory=list,
     )
     headers: t.Dict[str, str] = dataclasses.field(default_factory=dict)
+    encrypted: bool = False
+    signed: bool = False
+    verified: bool = False
     raw: t.Any = None
     service: t.Optional["Email"] = None
 
@@ -129,6 +139,31 @@ class EmailMessage(Message):
     def build(self, **kwargs):
         return EmailMessageBuilder(**kwargs)
 
+    def _check_encrypted_and_signed(self):
+        message = self.as_email_message()
+        encrypted = signed = False
+        for part in message.walk():
+            if part.get_content_type() == "multipart/encrypted":
+                encrypted = True
+            elif part.get_content_type() == "multipart/signed":
+                signed = True
+        return encrypted, signed
+
+    def decrypt(self):
+        """Decrypt the message.
+
+        Requires the `envelope` library to be installed.
+
+        """
+        if not ENVELOPE_AVAILABLE:
+            raise RuntimeError("envelope library not available")
+
+        message = self.as_email_message()
+
+        env = envelope.Envelope.load(message)
+
+        return self.from_email_message(env.as_message())
+
     def forward(
         self,
         to: AddressesType,
@@ -155,12 +190,12 @@ class EmailMessage(Message):
 
     @classmethod
     def from_binary_file(cls, fp: t.IO[bytes]):
-        msg = message_from_binary_file(fp)
+        msg = message_from_binary_file(fp, PyEmailMessage)
         return cls.from_email_message(msg)  # type: ignore
 
     @classmethod
     def from_bytes(cls, s: bytes):
-        msg = message_from_bytes(s)
+        msg = message_from_bytes(s, PyEmailMessage)
         return cls.from_email_message(msg)  # type: ignore
 
     @classmethod
@@ -192,12 +227,12 @@ class EmailMessage(Message):
 
     @classmethod
     def from_file(cls, fp: t.IO[str]):
-        msg = message_from_file(fp)
+        msg = message_from_file(fp, PyEmailMessage)
         return cls.from_email_message(msg)  # type: ignore
 
     @classmethod
     def from_string(cls, s: str):
-        msg = message_from_string(s)
+        msg = message_from_string(s, PyEmailMessage)
         return cls.from_email_message(msg)  # type: ignore
 
     def reply(
@@ -244,6 +279,41 @@ class EmailMessage(Message):
 
         service.send(self.to, body, cc=self.cc, **kwargs)
 
+    def verify(self):
+        """Verify the message integrity.
+
+        Requires the `envelope` library to be installed.
+
+        :returns: message integrity verification
+        :rtype: bool
+
+        """
+        if not ENVELOPE_AVAILABLE:
+            raise RuntimeError("envelope library not available")
+
+        message = self.as_email_message()
+
+        env = envelope.Envelope.load(message)
+
+        sig = data = None
+        for part in message.walk():
+            if part.get_content_type() == "multipart/signed":
+                for subpart in part.walk():
+                    if (
+                        subpart.get_content_type()
+                        == "application/pgp-signature"
+                    ):
+                        sig = part.get_payload().encode()
+                    else:
+                        data = part.get_payload().encode()
+
+        if sig and data:
+            result = env._gpg_verify(sig, data)
+            self.verified = result
+            return result
+
+        return False
+
 
 class EmailMessageBuilder(UserDict):
     """A builder for email messages.
@@ -277,6 +347,8 @@ class EmailMessageBuilder(UserDict):
         from_: t.Optional[AddressType] = None,
         attachments: t.Optional[t.Iterable[EmailAttachment]] = None,
         headers: t.Optional[t.Dict[str, str]] = None,
+        encrypt: bool = False,
+        sign: bool = False,
         service: t.Optional["Email"] = None,
     ):
         self.service = service
@@ -294,6 +366,8 @@ class EmailMessageBuilder(UserDict):
                 "reply_to": reply_to,
                 "from_": from_,
                 "attachments": attachments,
+                "encrypt": encrypt,
+                "sign": sign,
             },
         )
 
@@ -360,54 +434,14 @@ class EmailMessageBuilder(UserDict):
 
         return self.replace(from_=from_)
 
-    def format_message(self) -> PyEmailMessage:
-        message = PyEmailMessage()
+    def encrypt(self):
+        """Encrypt the message.
 
-        date = self.get("date")
-        if not date:
-            date = dt.datetime.now()
-        message["Date"] = format_datetime(date)
+        Requires the `envelope` library to be installed.
 
-        message["Message-ID"] = self.get("id", make_msgid())
-
-        from_ = self.get("from_")
-        if from_:
-            message["From"] = from_
-
-        to = self.get("to")
-        if to:
-            message["To"] = to
-
-        cc = self.get("cc")
-        if cc:
-            message["Cc"] = cc
-
-        reply_to = self.get("reply_to")
-        if reply_to:
-            message["Reply-To"] = reply_to
-
-        subject = self.get("subject")
-        if subject:
-            message["Subject"] = subject
-
-        message.set_content(self["body"], subtype="plain")
-
-        amp_html_body = self.get("amp_html_body")
-        if amp_html_body:
-            message.add_alternative(amp_html_body, subtype="x-amp-html")
-
-        html_body = self.get("html_body")
-        if html_body:
-            message.add_alternative(html_body, subtype="html")
-
-        message["User-Agent"] = message["X-Mailer"] = USER_AGENT
-
-        headers = self.get("headers")
-        if headers:
-            for name, value in headers.items():
-                message[name] = value
-
-        return message
+        """
+        if not ENVELOPE_AVAILABLE:
+            raise RuntimeError("envelope library not available")
 
     def html_body(self, html_body: t.Optional[str] = None):
         if not html_body:
@@ -432,6 +466,15 @@ class EmailMessageBuilder(UserDict):
         if not self.service:
             raise NotImplementedError()
         return self.service.send_message(self.format_message())
+
+    def sign(self):
+        """Sign the message.
+
+        Requires the `envelope` library to be installed.
+
+        """
+        if not ENVELOPE_AVAILABLE:
+            raise RuntimeError("envelope library not available")
 
     def subject(self, subject: t.Optional[str] = None):
         if not subject:

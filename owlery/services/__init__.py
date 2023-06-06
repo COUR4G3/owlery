@@ -358,6 +358,14 @@ class Service:
         """
         return
 
+    def generate_media_urls(self, attachments: t.List[Attachment]):
+        """Generate URLs for services that require external media URLs."""
+        urls = []
+        for attachment in attachments:
+            url = self._media_helper(attachment)
+            urls.append(url)
+        return urls
+
     def open(self):
         """Open or prepare a connection or session.
 
@@ -369,6 +377,10 @@ class Service:
 
         """
         return
+
+    def media_helper(self, f):
+        """Register a function to help with external media."""
+        self._media_helper = f
 
     @contextmanager
     def outbox(self):
@@ -652,6 +664,13 @@ class ServiceManager(Service):
             if send and not found_send:
                 raise ServiceSendCapabilityError()
 
+    def media_helper(self, f):
+        """Register a function to help with external media."""
+        super().media_helper(f)
+
+        for service in self.services.values():
+            service.media_helper(f)
+
     def register(
         self,
         service_cls,
@@ -679,6 +698,10 @@ class ServiceManager(Service):
             raise KeyError(f"Service '{name}' already exists")
 
         service = service_cls(*args, **kwargs)
+
+        if self._media_helper:
+            service.media_helper(self._media_helper)
+
         self.services[name] = service
 
         on_register_service.send(self, service=service)

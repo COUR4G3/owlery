@@ -1,9 +1,10 @@
 Owlery
 ======
 
-Uniform messaging service for Python applications supporting a variety of messaging services and vendors, allowing easy
-substitution and drop-in of services and vendors during runtime, configuration, development cycle or application
-evolution - even sending different messages through different vendors based on rules.
+Uniform messaging service supporting a variety of messaging services and vendors easily integrated with your Python
+applications or usable from your command-line, allowing easy substitution and drop-in of services and vendors during
+runtime, configuration, development cycle or application evolution - even sending different messages through different
+vendors based on rules.
 
 
 ## Links
