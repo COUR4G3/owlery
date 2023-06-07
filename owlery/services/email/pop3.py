@@ -97,3 +97,4 @@ class POP3(Email):
         for i in range(1, min(count, limit) + 1):
             res, data, octets = self.session.retr(i)
             yield EmailMessage.from_bytes(b"\r\n".join(data))
+            self.session.dele(i)
