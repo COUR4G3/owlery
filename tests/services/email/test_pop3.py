@@ -1,5 +1,6 @@
 import imaplib
 import secrets
+import socket
 import time
 
 import pytest
@@ -9,8 +10,43 @@ from owlery.services.email import EmailMessage
 from owlery.services.email.pop3 import POP3
 
 
+def check_pop3(host, port):
+    try:
+        sock = socket.create_connection((host, port), timeout=5.0)
+        sock.send(b"\0")
+        sock.recv(1)
+    except (OSError, socket.timeout):
+        return False
+    finally:
+        sock.close()
+
+    return True
+
+
+@pytest.fixture(scope="session")
+def pop3_service(docker_ip, docker_services):
+    port = docker_services.port_for("pop3", 110)
+
+    docker_services.wait_until_responsive(
+        timeout=30.0,
+        pause=0.1,
+        check=lambda: check_pop3(docker_ip, port),
+    )
+
+    return docker_ip, port
+
+
 @pytest.fixture()
-def message():
+def message(docker_services, pop3_service):
+    host = pop3_service[0]
+    port = docker_services.port_for("pop3", 143)
+
+    docker_services.wait_until_responsive(
+        timeout=30.0,
+        pause=0.1,
+        check=lambda: check_pop3(host, port),
+    )
+
     message = EmailMessage(
         to=["user"],
         subject=f"Test message {secrets.token_hex(8)}",
@@ -18,7 +54,7 @@ def message():
         from_="test@example.com",
     )
 
-    with imaplib.IMAP4(host="localhost", port=144) as imap:
+    with imaplib.IMAP4(host=host, port=port) as imap:
         imap.login("user", "pass")
 
         imap.append(
@@ -32,23 +68,26 @@ def message():
 
 
 @pytest.fixture(scope="session")
-def pop3():
-    return POP3(host="localhost", port=110, user="user", password="pass")
+def pop3(pop3_service):
+    host, port = pop3_service
+    return POP3(host=host, port=port, user="user", password="pass")
 
 
 @pytest.fixture
-def manager_with_pop3(manager):
+def manager_with_pop3(manager, pop3_service):
+    host, port = pop3_service
     return manager.register(
         POP3,
-        host="localhost",
-        port=110,
+        host=host,
+        port=port,
         user="user",
         password="pass",
     )
 
 
-def test_init():
-    POP3(host="localhost", port=110, user="user", password="pass")
+def test_init(pop3_service):
+    host, port = pop3_service
+    POP3(host=host, port=port, user="user", password="pass")
 
 
 @pytest.mark.integration
@@ -58,10 +97,13 @@ def test_connect(pop3):
 
 
 @pytest.mark.integration
-def test_connect_ssl():
+def test_connect_ssl(docker_services, pop3_service):
+    host = pop3_service[0]
+    port = docker_services.port_for("pop3", 995)
+
     pop3 = POP3(
-        host="localhost",
-        port=995,
+        host=host,
+        port=port,
         ssl=True,
         user="user",
         password="pass",
@@ -72,10 +114,11 @@ def test_connect_ssl():
 
 
 @pytest.mark.integration
-def test_connect_starttls():
+def test_connect_starttls(pop3_service):
+    host, port = pop3_service
     pop3 = POP3(
-        host="localhost",
-        port=110,
+        host=host,
+        port=port,
         starttls=True,
         user="user",
         password="pass",

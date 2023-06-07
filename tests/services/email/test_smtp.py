@@ -1,7 +1,34 @@
+import socket
+
 import pytest
 
 from owlery.exceptions import ServiceAuthFailed
 from owlery.services.email.smtp import SMTP
+
+
+def check_smtp(host, port):
+    try:
+        sock = socket.create_connection((host, port), timeout=5.0)
+        sock.recv(1)
+    except (OSError, socket.timeout):
+        return False
+    finally:
+        sock.close()
+
+    return True
+
+
+@pytest.fixture(scope="session")
+def smtp_service(docker_ip, docker_services):
+    port = docker_services.port_for("smtp", 1025)
+
+    docker_services.wait_until_responsive(
+        timeout=30.0,
+        pause=0.1,
+        check=lambda: check_smtp(docker_ip, port),
+    )
+
+    return docker_ip, port
 
 
 @pytest.fixture(scope="session")
@@ -15,15 +42,18 @@ def message():
 
 
 @pytest.fixture(scope="session")
-def smtp():
-    return SMTP(host="localhost", port=25, user="test", password="test")
+def smtp(smtp_service):
+    host, port = smtp_service
+    return SMTP(host=host, port=port, user="test", password="test")
 
 
 @pytest.fixture
-def manager_with_smtp(manager):
+def manager_with_smtp(manager, smtp_service):
+    host, port = smtp_service
     return manager.register(
         SMTP,
-        host="localhost",
+        host=host,
+        port=port,
         user="test",
         password="test",
     )
@@ -60,10 +90,12 @@ def test_connect(smtp):
 
 
 @pytest.mark.integration
-def test_connect_ssl():
+def test_connect_ssl(docker_ip, docker_services):
+    port = docker_services.port_for("imap", 465)
+
     smtp = SMTP(
-        host="localhost",
-        port=465,
+        host=docker_ip,
+        port=port,
         ssl=True,
         user="user",
         password="pass",
@@ -74,10 +106,12 @@ def test_connect_ssl():
 
 
 @pytest.mark.integration
-def test_connect_starttls():
+def test_connect_starttls(docker_ip, docker_services):
+    port = docker_services.port_for("imap", 587)
+
     smtp = SMTP(
-        host="localhost",
-        port=587,
+        host=docker_ip,
+        port=port,
         starttls=True,
         user="user",
         password="pass",
@@ -88,16 +122,18 @@ def test_connect_starttls():
 
 
 @pytest.mark.integration
-def test_connect_auth():
-    smtp = SMTP(host="localhost", port=587, user="user", password="pass")
+def test_connect_auth(docker_ip, docker_services):
+    port = docker_services.port_for("imap", 587)
+    smtp = SMTP(host=docker_ip, port=port, user="user", password="pass")
 
     smtp.open()
     smtp.close()
 
 
 @pytest.mark.integration
-def test_connect_wrong_credentials():
-    smtp = SMTP(host="localhost", port=587, user="wrong", password="wrong")
+def test_connect_wrong_credentials(docker_ip, docker_services):
+    port = docker_services.port_for("imap", 587)
+    smtp = SMTP(host=docker_ip, port=port, user="user", password="wrong")
 
     with pytest.raises(ServiceAuthFailed):
         smtp.open()

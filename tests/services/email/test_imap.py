@@ -1,4 +1,5 @@
 import imaplib
+import socket
 import time
 
 from email.utils import make_msgid
@@ -10,8 +11,35 @@ from owlery.services.email import EmailMessage
 from owlery.services.email.imap import IMAP
 
 
+def check_imap(host, port):
+    try:
+        sock = socket.create_connection((host, port), timeout=5.0)
+        sock.recv(1)
+    except (OSError, socket.timeout):
+        return False
+    finally:
+        sock.close()
+
+    return True
+
+
+@pytest.fixture(scope="session")
+def imap_service(docker_ip, docker_services):
+    port = docker_services.port_for("imap", 143)
+
+    docker_services.wait_until_responsive(
+        timeout=30.0,
+        pause=0.1,
+        check=lambda: check_imap(docker_ip, port),
+    )
+
+    return docker_ip, port
+
+
 @pytest.fixture()
-def message():
+def message(imap_service):
+    host, port = imap_service
+
     message = EmailMessage(
         to=["user"],
         subject="Test message",
@@ -20,7 +48,7 @@ def message():
         id=make_msgid(),
     )
 
-    with imaplib.IMAP4(host="localhost", port=143) as imap:
+    with imaplib.IMAP4(host=host, port=port) as imap:
         imap.login("user", "pass")
 
         imap.append(
@@ -34,38 +62,44 @@ def message():
 
 
 @pytest.fixture(scope="session")
-def imap():
-    return IMAP(host="localhost", port=143, user="user", password="pass")
+def imap(imap_service):
+    host, port = imap_service
+    return IMAP(host=host, port=port, user="user", password="pass")
 
 
 @pytest.fixture
-def manager_with_imap(manager):
+def manager_with_imap(imap_service, manager):
+    host, port = imap_service
     return manager.register(
         IMAP,
-        host="localhost",
-        port=143,
+        host=host,
+        port=port,
         user="user",
         password="pass",
     )
 
 
-def test_init():
-    IMAP(host="localhost", port=143, user="user", password="pass")
+def test_init(imap_service):
+    host, port = imap_service
+    IMAP(host=host, port=port, user="user", password="pass")
 
 
 @pytest.mark.integration
-def test_connect():
-    imap = IMAP(host="localhost", port=143, user="user", password="pass")
+def test_connect(imap_service):
+    host, port = imap_service
+    imap = IMAP(host=host, port=port, user="user", password="pass")
 
     imap.open()
     imap.close()
 
 
 @pytest.mark.integration
-def test_connect_ssl():
+def test_connect_ssl(docker_ip, docker_services):
+    port = docker_services.port_for("imap", 993)
+
     imap = IMAP(
-        host="localhost",
-        port=993,
+        host=docker_ip,
+        port=port,
         ssl=True,
         user="user",
         password="pass",
@@ -76,10 +110,12 @@ def test_connect_ssl():
 
 
 @pytest.mark.integration
-def test_connect_starttls():
+def test_connect_starttls(imap_service):
+    host, port = imap_service
+
     imap = IMAP(
-        host="localhost",
-        port=143,
+        host=host,
+        port=port,
         starttls=True,
         user="user",
         password="pass",
@@ -91,8 +127,9 @@ def test_connect_starttls():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_connect_wrong_credentials():
-    imap = IMAP(host="localhost", port=143, user="user", password="wrong")
+def test_connect_wrong_credentials(imap_service):
+    host, port = imap_service
+    imap = IMAP(host=host, port=port, user="user", password="wrong")
 
     with pytest.raises(ServiceAuthFailed):
         imap.open()

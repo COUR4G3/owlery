@@ -1,15 +1,5 @@
 version: "3.6"
 services:
-  docs:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      target: docs
-    ports:
-       - 8000:8000
-    volumes:
-      - ./:/opt/owlery
-    restart: unless-stopped
   imap:
     image: dovecot/dovecot:latest
     ports:
@@ -24,6 +14,7 @@ services:
     image: dovecot/dovecot:latest
     ports:
       - 110:110
+      - 144:143
       - 995:995
     volumes:
       - ./dovecot.conf:/etc/dovecot/dovecot.conf:ro
