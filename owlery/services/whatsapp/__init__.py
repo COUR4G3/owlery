@@ -115,7 +115,7 @@ class WhatsAppMessageBuilder(MessageBuilder):
         label: t.Optional[str] = None,
     ):
         return self._replace(
-            location=WhatsAppLocation(lat, lon, address, label)
+            location=WhatsAppLocation(lat, lon, address, label),
         )
 
     def to(self, to: str):
@@ -141,7 +141,8 @@ class WhatsApp(Service):
     def format_number(self, number):
         number = phonenumbers.parse(number, self.region)
         number = phonenumbers.format_number(
-            number, phonenumbers.PhoneNumberFormat.E164
+            number,
+            phonenumbers.PhoneNumberFormat.E164,
         )
 
         return number

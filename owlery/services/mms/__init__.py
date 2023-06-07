@@ -112,7 +112,8 @@ class MMS(Service):
     def format_number(self, number):
         number = phonenumbers.parse(number, self.region)
         number = phonenumbers.format_number(
-            number, phonenumbers.PhoneNumberFormat.E164
+            number,
+            phonenumbers.PhoneNumberFormat.E164,
         )
 
         return number

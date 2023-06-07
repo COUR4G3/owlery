@@ -18,11 +18,12 @@ class TwilioWhatsApp(TwilioMixin, WhatsApp):
     name = "twilio_whatsapp"
 
     def format_number(self, number):
-        number = number.lstrip("whatsapp:")
+        number = number.replace("whatsapp:", "")
 
         number = phonenumbers.parse(number, self.region)
         number = phonenumbers.format_number(
-            number, phonenumbers.PhoneNumberFormat.E164
+            number,
+            phonenumbers.PhoneNumberFormat.E164,
         )
 
         return f"whatsapp:{number}"
@@ -30,13 +31,13 @@ class TwilioWhatsApp(TwilioMixin, WhatsApp):
     def receive(self, limit: int = 100, **kwargs):
         messages = self.client.messages.stream(
             to=self.format_number(self.sender_id),
-            date_sent_after=date_sent_after,
+            # date_sent_after=date_sent_after,
             limit=limit,
         )
 
         for message in messages:
-            to = message.to.lstrip("whatsapp:")
-            from_ = message.waid.lstrip("whatsapp:")
+            to = message.to.replace("whatsapp:", "")
+            from_ = message.waid.replace("whatsapp:", "")
 
             yield WhatsAppMessage(
                 to=to,
@@ -47,9 +48,9 @@ class TwilioWhatsApp(TwilioMixin, WhatsApp):
     def receive_webhook(self, request):
         self._validate_webhook_request(request)
 
-        to = request.form["To"].lstrip("whatsapp:")
+        to = request.form["To"].replace("whatsapp:", "")
         body = request.form["Body"]
-        from_ = request.form["From"].lstrip("whatsapp:")
+        from_ = request.form["From"].replace("whatsapp:", "")
 
         message = WhatsAppMessage(
             to=to,
@@ -60,7 +61,8 @@ class TwilioWhatsApp(TwilioMixin, WhatsApp):
             profile_name=request.form.get("ProfileName"),
             forwarded=request.form.get("Forwarded", False),
             frequently_forwarded=request.form.get(
-                "FrequentlyForwarded", False
+                "FrequentlyForwarded",
+                False,
             ),
             raw=request.form,
             service=self,
@@ -110,9 +112,9 @@ class TwilioWhatsApp(TwilioMixin, WhatsApp):
             media_urls = None
 
         message = WhatsAppMessage(
-            to=to.lstrip("whatsapp:"),
+            to=to.replace("whatsapp:", ""),
             body=body,
-            from_=from_ and from_.lstrip("whatsapp:") or None,
+            from_=from_ and from_.replace("whatsapp:", "") or None,
             attachments=attachments,
             location=location,
             raw=kwargs,

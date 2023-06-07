@@ -86,4 +86,3 @@ jobs:
         run: tox r -e typing -vv --notest
       - name: Run typing checks
         run: tox r -e typing --skip-pkg-install
-
