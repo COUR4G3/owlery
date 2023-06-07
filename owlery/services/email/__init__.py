@@ -1,5 +1,4 @@
 import dataclasses
-import datetime as dt
 import typing as t
 
 from collections import UserDict
@@ -92,9 +91,8 @@ class EmailMessage(Message):
     def as_email_message(self):
         message = PyEmailMessage()
 
-        if not self.date:
-            date = dt.datetime.now()
-        message["Date"] = format_datetime(date)
+        if self.date:
+            message["Date"] = format_datetime(self.date)
 
         if not self.id:
             self.id = make_msgid()
@@ -210,6 +208,22 @@ class EmailMessage(Message):
         date = message.get("Date", None)
         if date:
             date = parsedate_to_datetime(date)
+        id = message.get("Message-ID")
+
+        headers = {}
+        for name, value in message.items():
+            if name in (
+                "From",
+                "Subject",
+                "To",
+                "Cc",
+                "Reply-To",
+                "Date",
+                "Message-ID",
+            ):
+                continue
+            headers[name] = value
+
         headers = dict(message.items())
 
         return cls(
@@ -222,6 +236,7 @@ class EmailMessage(Message):
             from_=from_,
             headers=headers,
             date=date,
+            id=id,
             raw=message,
         )
 
