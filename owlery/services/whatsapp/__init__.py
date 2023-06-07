@@ -14,7 +14,7 @@ class WhatsAppLocation:
     label: t.Optional[str] = None
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclasses.dataclass
 class WhatsAppMessage(Message):
     """A representation of a WhatsApp message.
 
@@ -34,8 +34,8 @@ class WhatsAppMessage(Message):
 
     """
 
-    to: t.Optional[str]
-    body: t.Optional[str]
+    to: t.Optional[str] = None
+    body: t.Optional[str] = None
     from_: t.Optional[str] = None
     attachments: t.List[Attachment] = dataclasses.field(default_factory=list)
     location: t.Optional[WhatsAppLocation] = None

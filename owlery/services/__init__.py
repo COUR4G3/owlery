@@ -56,7 +56,7 @@ MessageStatus = t.Literal[
 ]
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclasses.dataclass
 class Message:
     """A representation for a received messages.
 

@@ -6,7 +6,7 @@ import phonenumbers
 from .. import Message, Service, ServiceManager
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclasses.dataclass
 class SMSMessage(Message):
     """A representation of an SMS text message.
 
@@ -20,8 +20,8 @@ class SMSMessage(Message):
 
     """
 
-    to: t.Optional[str]
-    body: t.Optional[str]
+    to: t.Optional[str] = None
+    body: t.Optional[str] = None
     from_: t.Optional[str] = None
 
     def forward(self, to: str, service=None, **kwargs):

@@ -44,7 +44,7 @@ class EmailAttachment(Attachment):
     filename: t.Optional[str] = None
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclasses.dataclass
 class EmailMessage(Message):
     """A representation for a received email message.
 
@@ -66,9 +66,9 @@ class EmailMessage(Message):
 
     """
 
-    to: AddressesType
-    subject: str
-    body: str
+    to: t.Optional[AddressesType] = None
+    subject: t.Optional[str] = None
+    body: t.Optional[str] = None
     html_body: t.Optional[str] = None
     amp_html_body: t.Optional[str] = None
     cc: AddressesType = dataclasses.field(default_factory=list)
