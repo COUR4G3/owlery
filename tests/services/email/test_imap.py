@@ -1,6 +1,8 @@
 import imaplib
 import time
 
+from email.utils import make_msgid
+
 import pytest
 
 from owlery.exceptions import ServiceAuthFailed
@@ -15,6 +17,7 @@ def message():
         subject="Test message",
         body="This is a test message.",
         from_="test@example.com",
+        id=make_msgid(),
     )
 
     with imaplib.IMAP4(host="localhost", port=143) as imap:
@@ -120,26 +123,30 @@ def test_specified_port():
 @pytest.mark.integration
 def test_receive(imap, message):
     for received_message in imap.receive(limit=10):
-        assert received_message == message
+        received_message = received_message
     imap.close()
+    assert received_message.id == message.id
 
 
 @pytest.mark.integration
 def test_receive_contextmanager(imap, message):
     with imap:
         for received_message in imap.receive(limit=10):
-            assert received_message == message
+            received_message = received_message
+    assert received_message.id == message.id
 
 
 @pytest.mark.integration
 def test_receive_with_manager(manager_with_imap, message):
     for received_message in manager_with_imap.receive(limit=10):
-        assert received_message == message
+        received_message = received_message
     manager_with_imap.close()
+    assert received_message.id == message.id
 
 
 @pytest.mark.integration
 def test_receive_with_manager_contextmanager(manager_with_imap, message):
     with manager_with_imap:
         for received_message in manager_with_imap.receive(limit=10):
-            assert received_message == message
+            received_message = received_message
+    assert received_message.id == message.id

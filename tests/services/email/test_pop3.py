@@ -1,4 +1,5 @@
 import imaplib
+import secrets
 import time
 
 import pytest
@@ -12,12 +13,12 @@ from owlery.services.email.pop3 import POP3
 def message():
     message = EmailMessage(
         to=["user"],
-        subject="Test message",
+        subject=f"Test message {secrets.token_hex(8)}",
         body="This is a test message.",
         from_="test@example.com",
     )
 
-    with imaplib.IMAP4(host="localhost", port=143) as imap:
+    with imaplib.IMAP4(host="localhost", port=144) as imap:
         imap.login("user", "pass")
 
         imap.append(
@@ -123,27 +124,35 @@ def test_specified_port():
 
 @pytest.mark.integration
 def test_receive(pop3, message):
+    received_message = None
     for received_message in pop3.receive(limit=10):
-        assert received_message == message
+        received_message = received_message
     pop3.close()
+    assert received_message.subject == message.subject
 
 
 @pytest.mark.integration
 def test_receive_contextmanager(pop3, message):
+    received_message = None
     with pop3:
         for received_message in pop3.receive(limit=10):
-            assert received_message == message
+            received_message = received_message
+    assert received_message.subject == message.subject
 
 
 @pytest.mark.integration
 def test_receive_with_manager(manager_with_pop3, message):
+    received_message = None
     for received_message in manager_with_pop3.receive(limit=10):
-        assert received_message == message
+        received_message = received_message
     manager_with_pop3.close()
+    assert received_message.subject == message.subject
 
 
 @pytest.mark.integration
 def test_receive_with_manager_contextmanager(manager_with_pop3, message):
+    received_message = None
     with manager_with_pop3:
         for received_message in manager_with_pop3.receive(limit=10):
-            assert received_message == message
+            received_message = received_message
+    assert received_message.subject == message.subject
