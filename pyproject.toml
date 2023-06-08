@@ -130,6 +130,7 @@ module = [
     "click",
     "django",
     "django.*",
+    "envelope",
     "flask",
     "phonenumbers",
     "requests_toolbelt.sessions",
