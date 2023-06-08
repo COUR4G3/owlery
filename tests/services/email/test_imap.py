@@ -79,9 +79,8 @@ def manager_with_imap(imap_service, manager):
     )
 
 
-def test_init(imap_service):
-    host, port = imap_service
-    IMAP(host=host, port=port, user="user", password="pass")
+def test_init():
+    IMAP(host="localhost", port=143, user="user", password="pass")
 
 
 @pytest.mark.integration

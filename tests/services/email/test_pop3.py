@@ -85,9 +85,8 @@ def manager_with_pop3(manager, pop3_service):
     )
 
 
-def test_init(pop3_service):
-    host, port = pop3_service
-    POP3(host=host, port=port, user="user", password="pass")
+def test_init():
+    POP3(host="localhost", port=110, user="user", password="pass")
 
 
 @pytest.mark.integration

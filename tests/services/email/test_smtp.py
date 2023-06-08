@@ -42,9 +42,8 @@ def message():
 
 
 @pytest.fixture(scope="session")
-def smtp(smtp_service):
-    host, port = smtp_service
-    return SMTP(host=host, port=port, user="test", password="test")
+def smtp():
+    return SMTP(host="localhost", port=25, user="test", password="test")
 
 
 @pytest.fixture
