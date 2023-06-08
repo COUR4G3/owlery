@@ -162,30 +162,6 @@ class EmailMessage(Message):
 
         return self.from_email_message(env.as_message())
 
-    def forward(
-        self,
-        to: AddressesType,
-        quote: bool = True,
-        service: t.Optional["Email"] = None,
-        **kwargs,
-    ):
-        r"""Forward this message.
-
-        :param to: A list of recipients.
-        :param quote: Quote the original message, defaults to ``True``.
-        :param service: Optional service to use.
-        :param \*\*kwargs: See the :class:`EmailMessage` object.
-
-        """
-        if not service:
-            service = self.service
-        if not service:
-            return
-
-        body = self.body
-
-        service.send(to, body, attachments=self.attachments, **kwargs)
-
     @classmethod
     def from_binary_file(cls, fp: t.IO[bytes]):
         msg = message_from_binary_file(fp, PyEmailMessage)
@@ -249,50 +225,6 @@ class EmailMessage(Message):
     def from_string(cls, s: str):
         msg = message_from_string(s, PyEmailMessage)
         return cls.from_email_message(msg)  # type: ignore
-
-    def reply(
-        self,
-        quote: bool = True,
-        service: t.Optional["Email"] = None,
-        **kwargs,
-    ):
-        r"""Reply to this message.
-
-        :param quote: Quote the original message, defaults to ``True``.
-        :param service: Optional service to use.
-        :param \*\*kwargs: See the :class:`EmailMessage` object.
-
-        """
-        if not service:
-            service = self.service
-        if not service:
-            return
-
-        body = self.body
-
-        service.send(self.to, body, **kwargs)
-
-    def reply_all(
-        self,
-        quote: bool = True,
-        service: t.Optional["Email"] = None,
-        **kwargs,
-    ):
-        r"""Reply to all recipients of this message.
-
-        :param quote: Quote the original message, defaults to ``True``.
-        :param service: Optional service to use.
-        :param \*\*kwargs: See the :class:`EmailMessage` object.
-
-        """
-        if not service:
-            service = self.service
-        if not service:
-            return
-
-        body = self.body
-
-        service.send(self.to, body, cc=self.cc, **kwargs)
 
     def verify(self):
         """Verify the message integrity.

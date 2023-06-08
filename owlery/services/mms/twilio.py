@@ -32,7 +32,7 @@ class TwilioMMS(MMS):
     def receive(self, limit: int = 100, **kwargs):
         messages = self.client.messages.stream(
             to=self.sender_id,
-            date_sent_after=date_sent_after,
+            # date_sent_after=date_sent_after,
             limit=limit,
         )
 
