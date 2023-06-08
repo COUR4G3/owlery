@@ -3,6 +3,12 @@
 Thank you for wanting to contribute to and improve this project!
 
 
+### Note!
+
+While this document outlines the ideal way to contribute to this project, **currently** the project is unstable and
+undergoing rapid development.
+
+
 ## Contents
 
 * [Getting Started](#getting-started)

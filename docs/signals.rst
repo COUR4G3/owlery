@@ -91,11 +91,11 @@ detailed information on the inner workings.
     Available statuses are:
 
     * ``'pending'`` - message has not yet been sent.
-    * ``'error'`` - an error occured sending the message.
+    * ``'error'`` - an error occurred sending the message.
     * ``'sent'`` - message has been sent.
     * ``'received'`` - message has been received.
     * ``'read'`` - message has been read.
-    * ``'unknown'`` - service returned an unknown state, interogate the ``raw`` data.
+    * ``'unknown'`` - service returned an unknown state, interrogate the ``raw`` data.
 
     Services may support none, some or all of these statuses.
 

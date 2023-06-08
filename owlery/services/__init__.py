@@ -65,8 +65,8 @@ class Message:
     :param date: The date the message was sent/received.
     :param raw: The raw data response from service.
     :param status: The message status.
-    :param exc: The exception object if an error occured.
-    :param service: Service to use for sending, replies and fowarding.
+    :param exc: The exception object if an error occurred.
+    :param service: Service to use for sending, replies and forwarding.
 
     """
 
