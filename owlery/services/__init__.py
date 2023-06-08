@@ -177,8 +177,6 @@ class Service:
 
         self._media_helper = None
 
-        self._wrap_methods()
-
         self.logger = logging.getLogger(__name__)
 
     def _on_receive_message(self, message):
@@ -188,15 +186,13 @@ class Service:
 
         self.logger.debug("Received message:\n%r", message)
 
-    def _wrap_close(self):
+    def _wrap_close(self, f):
         # wrap the close method:
         # - dispatch the `on_session_close` signals.
         # - unset the ``opened`` flag.
         # - log a message.
-        original_close = self.close
-
         def close(self):
-            original_close()
+            f()
 
             on_close_session.send(self)
 
@@ -204,28 +200,16 @@ class Service:
 
             self.opened = False
 
-        self.close = close.__get__(self, Service)
-        self._close = original_close
+        return close.__get__(self, Service)
 
-    def _wrap_methods(self):
-        # wrap all methods
-        self._wrap_close()
-        self._wrap_open()
-        self._wrap_receive()
-        self._wrap_receive_webhook()
-        self._wrap_send()
-        self._wrap_status_callback()
-
-    def _wrap_open(self):
+    def _wrap_open(self, f):
         # wrap the open method:
         # - dispatch `on_session_open` signals.
         # - set the ``opened`` flag.
         # - log a message.
 
-        original_open = self.open
-
         def open(self):
-            original_open()
+            f()
 
             on_open_session.send(self)
 
@@ -233,23 +217,20 @@ class Service:
 
             self.opened = True
 
-        self.open = open.__get__(self, Service)
-        self._open = original_open
+        return open.__get__(self, Service)
 
-    def _wrap_receive(self):
+    def _wrap_receive(self, f):
         # wrap the receive method:
         # - dispatch `on_receive_message` signals.
         # - open the connection or session if ``opened`` flag not set.
         # - log messages.
-
-        original_receive = self.receive
 
         def receive(self, **kwargs):
             if not self.opened:
                 self.open()
 
             count = 0
-            for message in original_receive(**kwargs):
+            for message in f(**kwargs):
                 self._on_receive_message(message)
 
                 yield message
@@ -257,19 +238,16 @@ class Service:
 
             self.logger.info("Received %d messages", count)
 
-        self.receive = receive.__get__(self, Service)
-        self._receive = original_receive
+        return receive.__get__(self, Service)
 
-    def _wrap_receive_webhook(self):
+    def _wrap_receive_webhook(self, f):
         # wrap the receive_webhook method:
         # - dispatch `on_receive_message` signals.
         # - log messages.
 
-        original_receive = self.receive_webhook
-
         def receive_webhook(self, request):
             count = 0
-            for message in original_receive(request):
+            for message in f(request):
                 self._on_receive_message(message)
 
                 yield message
@@ -277,17 +255,14 @@ class Service:
 
             self.logger.info("Received %d messages from webhook", count)
 
-        self.receive_webhook = receive_webhook.__get__(self, Service)
-        self._receive_webhook = original_receive
+        return receive_webhook.__get__(self, Service)
 
-    def _wrap_send(self):
+    def _wrap_send(self, f):
         # wrap the send method:
         # - dispatch ``on_before_send`` and ``on_after_send`` signals.
         # - open the connection or session if ``opened`` flag not set.
         # - silently discard the message if ``suppress`` flag is set.
         # - log messages.
-
-        original_send = self.send
 
         def send(self, **kwargs):
             on_before_send.send(self, message=kwargs)
@@ -298,7 +273,7 @@ class Service:
             if not self.opened:
                 self.open()
 
-            message = original_send(**kwargs)
+            message = f(**kwargs)
 
             on_after_send.send(self, message=message)
 
@@ -307,18 +282,15 @@ class Service:
 
             return message
 
-        self.send = send.__get__(self, Service)
-        self._send = original_send
+        return send.__get__(self, Service)
 
-    def _wrap_status_callback(self):
+    def _wrap_status_callback(self, f):
         # wrap the status_callback method:
         # - dispatch ``on_receive_status_callback`` signals.
         # - log messages.
 
-        original_status = self.status_callback
-
         def status_callback(self, request):
-            message_id, status, raw = original_status(request)
+            message_id, status, raw = f(request)
             on_receive_status_callback.send(
                 self,
                 message_id=message_id,
@@ -334,8 +306,7 @@ class Service:
 
             return message_id, status, raw
 
-        self.status_callback = status_callback.__get__(self, Service)
-        self._status_callback = original_status
+        return status_callback.__get__(self, Service)
 
     def __enter__(self):
         if not self.opened:
@@ -345,6 +316,22 @@ class Service:
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.close()
+
+    def __getattribute__(self, name):
+        attr = super().__getattribute__(name)
+
+        if name == "close":
+            return self._wrap_close(attr)
+        elif name == "open":
+            return self._wrap_open(attr)
+        elif name == "receive":
+            return self._wrap_receive(attr)
+        elif name == "send":
+            return self._wrap_send(attr)
+        elif name == "status_callback":
+            return self._wrap_status_callback(attr)
+
+        return attr
 
     def close(self):
         """Close a session or connection.
@@ -515,9 +502,6 @@ class ServiceManager(Service):
     can_receive = True
     can_send = True
 
-    _wrap_close = property()
-    _wrap_open = property()
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -526,15 +510,17 @@ class ServiceManager(Service):
 
         self._via = None
 
-        self._update_methods()
+    def __getattribute__(self, name):
+        attr = super(Service, self).__getattribute__(name)
 
-    def _update_methods(self):
-        # update methods for service managers
-        self._update_receive()
-        self._update_send()
+        if name == "receive":
+            return self._receive()
+        elif name == "send":
+            return self._send()
 
-    def _update_receive(self):
-        # update the send method:
+        return attr
+
+    def _receive(self):
         # - dispatch ``on_receive_message`` signal.
         # - select the correct service with ``via`` or receive on all services
 
@@ -567,10 +553,9 @@ class ServiceManager(Service):
                     yield message
                     limit -= 1
 
-        self.receive = receive.__get__(self, ServiceManager)
+        return receive.__get__(self, ServiceManager)
 
-    def _update_send(self):
-        # update the send method:: bool = False
+    def _send(self):
         # - dispatch ``on_before_send`` and ``on_after_send`` signals.
         # - silently discard the message if ``suppress`` flag is set.
         # - select the correct service, either default or ``via``.
@@ -606,10 +591,7 @@ class ServiceManager(Service):
 
             return result
 
-        self.send = send.__get__(self, ServiceManager)
-
-    def _wrap_methods(self):
-        return
+        return send.__get__(self, ServiceManager)
 
     def close(self):
         for service in self.services.values():
