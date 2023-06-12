@@ -3,26 +3,25 @@ services:
   imap:
     image: dovecot/dovecot:latest
     ports:
-      - 143:143
-      - 465:465
-      - 587:587
-      - 993:993
+      - "143"
+      - "465"
+      - "587"
+      - "993"
     volumes:
       - ./dovecot.conf:/etc/dovecot/dovecot.conf:ro
     restart: unless-stopped
   pop3:
     image: dovecot/dovecot:latest
     ports:
-      - 110:110
-      - 144:143
-      - 995:995
+      - "110"
+      - "143"
+      - "995"
     volumes:
       - ./dovecot.conf:/etc/dovecot/dovecot.conf:ro
     restart: unless-stopped
   smtp:
     image: mailhog/mailhog:latest
     ports:
-      - 25:1025
-      - 1025:1025
-      - 8025:8025
+      - "1025"
+      - "8025"
     restart: unless-stopped
