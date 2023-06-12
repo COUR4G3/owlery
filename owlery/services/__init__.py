@@ -1,14 +1,13 @@
-import dataclasses
 import datetime as dt
+import enum
 import logging
-import platform
 import random
 import typing as t
 
 from collections import UserDict, UserList
 from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
 
-from .. import __version__
 from ..exceptions import (
     ServiceNotRegistered,
     ServiceReceiveCapabilityError,
@@ -25,89 +24,88 @@ from ..signals import (
     on_unregister_service,
 )
 
-USER_AGENT = (
-    f"owlery/{__version__} "
-    f"{platform.python_implementation()}/{platform.python_version()}"
-)
 
-
-@dataclasses.dataclass
+@dataclass
 class Attachment:
     """A representation of an attachment.
 
-    :param data: Bytes or file-like object contain attachment data.
-    :param mimetype: Mimetype of the attachment, defaults to
-                     ``'application/octet-stream'``.
+    :param data: The attachment data.
+    :param mimetype: The mimetype, default `'application/octet-stream'`.
 
     """
 
     data: t.Union[bytes, t.IO[bytes]]
     mimetype: str = "application/octet-stream"
 
-
-MessageStatus = t.Literal[
-    "draft",
-    "queued",
-    "sent",
-    "received",
-    "read",
-    "cancelled",
-    "error",
-]
+    def read(self, n: int = -1):
+        if isinstance(self.data, bytes):
+            return self.data
+        return self.data.read(n)
 
 
-@dataclasses.dataclass
+class MessageState(enum.Enum):
+    DRAFT = "draft"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    READ = "read"
+    RECEIVED = "received"
+    ERROR = "error"
+
+
+@dataclass
 class Message:
-    """A representation for a received messages.
+    State = MessageState
 
-    :param id: The message unique identifier.
-    :param reply_id: The message identifier this message is replied to.
-    :param date: The date the message was sent/received.
-    :param raw: The raw data response from service.
-    :param status: The message status.
-    :param exc: The exception object if an error occurred.
-    :param service: Service to use for sending, replies and forwarding.
+    id: t.Optional[t.Any] = None
+    date: dt.datetime = field(default_factory=dt.datetime.now)
+    raw: t.Optional[t.Any] = None
 
-    """
-
-    id: t.Optional[str] = None
-    reply_id: t.Optional[str] = None
-    date: t.Optional[dt.datetime] = None
-    raw: t.Any = None
-    status: MessageStatus = "draft"
-    exc: t.Optional[Exception] = None
+    state: MessageState = MessageState.DRAFT
     service: t.Optional["Service"] = None
 
-    def as_dict(self):
-        return dataclasses.asdict(self)
+    def send(self, service: t.Optional["Service"] = None):
+        """Send the message.
 
-    def send(self, service=None):
+        :param service: The service to use, optional.
+
+        """
         if not service:
             service = self.service
         if not service:
-            raise ValueError("No service to send this message")
+            raise ValueError("No service associated with this message")
 
         return service.send_message(self)
 
 
 class MessageBuilder(UserDict):
-    def __init__(self, dict=None, service=None, **kwargs):
-        self.service = service
+    Message = Message
 
-        super().__init__(dict, **kwargs)
+    def as_message(self):
+        """Return the message as a message object."""
+        return self.Message(**self.data)
 
-    def _replace(self, **kwargs):
-        message = self.copy()
-        message.update(**kwargs)
+    def date(self, date: dt.datetime):
+        """Set a Date on the message."""
+        return self.__class__(**{**self.copy(), "date": date})
 
-        return message
+    def send(self, service: t.Optional["Service"] = None):
+        """Send the message.
 
-    def send(self):
-        service = self.service
+        :param service: The service to use, optional.
+
+        """
         if not service:
-            raise ValueError("No service to send this message")
+            service = self["service"]
+        if not service:
+            raise ValueError("No service associated with this message")
 
         return service.send(**self.data)
+
+    def _replace(self, **kwargs):
+        new = self.copy()
+        new.update(kwargs)
+
+        return new
 
 
 class Outbox(UserList):
@@ -468,9 +466,7 @@ class Service:
         :param message: A :class:`Message` message object.
 
         """
-        data = message.as_dict()
-        data["service"] = self
-        return message.send(**data)
+        return self.send(asdict(message))
 
     def status_callback(self, request):
         """Receive sent message status callback from a webhook.

@@ -1,51 +1,108 @@
-import dataclasses
+import datetime as dt
+import platform
 import typing as t
 
-from collections import UserDict
+from collections import UserList
+from dataclasses import dataclass, field
 from email import (
     message_from_binary_file,
     message_from_bytes,
     message_from_file,
     message_from_string,
 )
-from email.message import EmailMessage as PyEmailMessage
-from email.utils import (
-    format_datetime,
-    make_msgid,
-    parseaddr,
-    parsedate_to_datetime,
+from email.message import EmailMessage as _EmailMessage
+from email.policy import SMTP, EmailPolicy
+from email.utils import format_datetime, formataddr, make_msgid, parseaddr
+
+from ... import __version__
+from .. import Attachment, Message, MessageBuilder, Service, ServiceManager
+
+EMAIL_USER_AGENT = (
+    f"owlery/{__version__} "
+    f"{platform.python_implementation()}/{platform.python_version()}"
 )
 
-from .. import USER_AGENT, Attachment, Message, Service, ServiceManager
 
-try:
-    import envelope
-except ImportError:
-    ENVELOPE_AVAILABLE = False
-else:
-    ENVELOPE_AVAILABLE = True
-
-AddressType = t.Union[str, t.Tuple[t.Optional[str], str]]
-AddressesType = t.Iterable[AddressType]
-
-
-@dataclasses.dataclass
+@dataclass
 class EmailAttachment(Attachment):
     """A representation of an email attachment.
 
-    :param data: Bytes or file-like object contain attachment data.
-    :param filename: Filename of the attachment.
-    :param mimetype: Mimetype of the attachment, defaults to
-                     ``'application/octet-stream'``.
+    :param data: The attachment data.
+    :param mimetype: The mimetype, default `'application/octet-stream'`.
+    :param filename: The filename, optional.
+    :param cid: The Content-ID of the inline attachment, optional.
+    :param inline: Whether this is an inline attachment or not.
 
     """
 
     filename: t.Optional[str] = None
+    cid: t.Optional[str] = None
+    inline: bool = False
 
 
-@dataclasses.dataclass
+@dataclass
+class EmailRecipient:
+    """A representation of an email recipient.
+
+    :param email: The recipient's email address.
+    :param name: The recipient's name, optional.
+
+    """
+
+    email: str
+    name: t.Optional[str] = None
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            other = self.parse(other)
+        return super().__eq__(other)
+
+    def __str__(self):
+        return formataddr((self.name, self.email))
+
+    @classmethod
+    def parse(cls, s):
+        name, email = parseaddr(s)
+        return cls(name=name, email=email)
+
+
+EmailRecipientType = t.Union[EmailRecipient, str]
+EmailRecipientsType = t.Iterable[t.Union[EmailRecipient, str]]
+
+
+class EmailRecipients(UserList):
+    """A list of email recipients."""
+
+    def __init__(self, initlist: t.Optional[EmailRecipientsType] = None):
+        if initlist:
+            initlist = (
+                isinstance(s, str) and EmailRecipient.parse(s) or s
+                for s in initlist
+            )
+
+        super().__init__(initlist)
+
+    def append(self, item: EmailRecipientType):
+        if isinstance(item, str):
+            item = EmailRecipient.parse(item)
+        super().append(item)
+
+    def extend(self, other: EmailRecipientsType):
+        other = (
+            isinstance(s, str) and EmailRecipient.parse(s) or s for s in other
+        )
+
+        super().extend(other)
+
+    @classmethod
+    def parse(cls, s: str):
+        """Parse an email recipient from string."""
+        return cls(EmailRecipient.parse(t) for t in s.split(","))
+
+
+@dataclass
 class EmailMessage(Message):
-    """A representation for a received email message.
+    r"""A representation of an email message.
 
     :param to: A list of recipient addresses.
     :param subject: The email subject.
@@ -59,211 +116,222 @@ class EmailMessage(Message):
     :param from\\_: The from address of the email message.
     :param attachments: A list of attachments.
     :param headers: A list of additional messages headers.
-    :param encrypted: Email message is encrypted with GPG, PGP or S/MIME
-    :param verified: Email message integrity has been verified.
-    :param service: Service to use for sending, reply etc.
 
     """
 
-    to: t.Optional[AddressesType] = None
+    to: t.Optional[EmailRecipientsType] = None
     subject: t.Optional[str] = None
     body: t.Optional[str] = None
     html_body: t.Optional[str] = None
     amp_html_body: t.Optional[str] = None
-    cc: AddressesType = dataclasses.field(default_factory=list)
-    bcc: AddressesType = dataclasses.field(default_factory=list)
-    reply_to: t.Optional[AddressType] = None
-    from_: t.Optional[AddressType] = None
-    attachments: t.List[EmailAttachment] = dataclasses.field(
-        default_factory=list,
-    )
-    headers: t.Dict[str, str] = dataclasses.field(default_factory=dict)
-    encrypted: bool = False
-    signed: bool = False
-    verified: bool = False
-    raw: t.Any = None
-    service: t.Optional["Email"] = None
+    attachments: t.List[EmailAttachment] = field(default_factory=list)
+    cc: t.Optional[EmailRecipientsType] = None
+    bcc: t.Optional[EmailRecipientsType] = None
+    from_: t.Optional[EmailRecipientType] = None
+    reply_to: t.Optional[EmailRecipientType] = None
+    headers: t.Dict[str, str] = field(default_factory=dict)
+    user_agent: str = EMAIL_USER_AGENT
+    id: t.Optional[t.Any] = field(default_factory=make_msgid)
 
-    def as_bytes(self):
-        message = self.as_email_message()
-        return message.as_bytes()
+    _to: EmailRecipientsType = field(init=False, repr=False)
+    _cc: EmailRecipientsType = field(init=False, repr=False)
+    _bcc: EmailRecipientsType = field(init=False, repr=False)
 
-    def as_email_message(self):
-        message = PyEmailMessage()
+    def as_bytes(self, policy: t.Optional[EmailPolicy] = None):
+        """Return the email message as a bytes."""
+        message = self.as_email_message(policy=policy)
+        return message.as_bytes(policy=policy)
 
-        if self.date:
-            message["Date"] = format_datetime(self.date)
+    def as_email_message(self, policy: t.Optional[EmailPolicy] = None):
+        """Return the email message as a :class:`EmailMessage` object."""
+        message = _EmailMessage(policy=policy)
 
-        if not self.id:
-            self.id = make_msgid()
         message["Message-ID"] = self.id
+        message["Date"] = format_datetime(self.date)
+        message["To"] = str(self.to)
+        message["Subject"] = self.subject
 
-        if self.from_:
-            message["From"] = self.from_
-
-        if self.to:
-            message["To"] = self.to
-
+        if self.bcc:
+            message["Bcc"] = str(self.bcc)
         if self.cc:
-            message["Cc"] = self.cc
-
+            message["Cc"] = str(self.cc)
+        if self.from_:
+            message["From"] = str(self.from_)
         if self.reply_to:
-            message["Reply-To"] = self.reply_to
-
-        if self.subject:
-            message["Subject"] = self.subject
+            message["Reply-To"] = str(self.reply_to)
 
         message.set_content(self.body, subtype="plain")
 
         if self.amp_html_body:
             message.add_alternative(self.amp_html_body, subtype="x-amp-html")
-
         if self.html_body:
             message.add_alternative(self.html_body, subtype="html")
 
-        message["User-Agent"] = message["X-Mailer"] = USER_AGENT
+        for name, value in self.headers.items():
+            message[name] = value
 
-        if self.headers:
-            for name, value in self.headers.items():
-                message[name] = value
+        if self.user_agent:
+            message["User-Agent"] = message["X-Mailer"] = self.user_agent
 
         return message
 
-    def as_string(self):
-        message = self.as_email_message()
-        return message.as_string()
+    def as_string(self, policy: t.Optional[EmailPolicy] = None):
+        """Return the email message as a string."""
+        message = self.as_email_message(policy=policy)
+        return message.as_string(policy=policy)
 
-    @classmethod
-    def build(self, **kwargs):
-        return EmailMessageBuilder(**kwargs)
+    def attach(
+        self,
+        data: t.Union[bytes, t.IO[bytes]],
+        mimetype: str = "application/octet-stream",
+        filename: t.Optional[str] = None,
+        cid: t.Optional[str] = None,
+        inline: bool = False,
+    ):
+        """Attach a file to the email message.
 
-    def _check_encrypted_and_signed(self):
-        message = self.as_email_message()
-        encrypted = signed = False
-        for part in message.walk():
-            if part.get_content_type() == "multipart/encrypted":
-                encrypted = True
-            elif part.get_content_type() == "multipart/signed":
-                signed = True
-        return encrypted, signed
-
-    def decrypt(self):
-        """Decrypt the message.
-
-        Requires the `envelope` library to be installed.
+        :param data: The attachment data.
+        :param mimetype: The mimetype, default `'application/octet-stream'`.
+        :param filename: The filename, optional.
+        :param cid: The Content-ID of the inline attachment, optional.
+        :param inline: Whether this is an inline attachment or not.
 
         """
-        if not ENVELOPE_AVAILABLE:
-            raise RuntimeError("envelope library not available")
+        attachment = EmailAttachment(
+            data=data,
+            mimetype=mimetype,
+            filename=filename,
+            cid=cid,
+            inline=inline,
+        )
+        self.attachments.append(attachment)
+        return attachment
 
-        message = self.as_email_message()
+    @property  # type: ignore[no-redef]
+    def bcc(self):
+        return self._bcc
 
-        env = envelope.Envelope.load(message)
+    @bcc.setter
+    def bcc(self, value):
+        if type(value) is property:
+            value = EmailRecipients()
+        self._bcc = value
 
-        return self.from_email_message(env.as_message())
+    @property  # type: ignore[no-redef]
+    def cc(self):
+        return self._cc
+
+    @cc.setter
+    def cc(self, value):
+        if type(value) is property:
+            value = EmailRecipients()
+        self._cc = value
 
     @classmethod
-    def from_binary_file(cls, fp: t.IO[bytes]):
-        msg = message_from_binary_file(fp, PyEmailMessage)
-        return cls.from_email_message(msg)  # type: ignore
+    def from_binary_file(cls, fp: t.IO[bytes], policy: EmailPolicy = SMTP):
+        """Parse an email message from a binary file."""
+        message = message_from_binary_file(
+            fp,
+            _class=_EmailMessage,
+            policy=policy,
+        )
+        return cls.as_email_message(message)  # type: ignore
 
     @classmethod
-    def from_bytes(cls, s: bytes):
-        msg = message_from_bytes(s, PyEmailMessage)
-        return cls.from_email_message(msg)  # type: ignore
+    def from_bytes(cls, s: bytes, policy: EmailPolicy = SMTP):
+        """Parse an email message from bytes."""
+        message = message_from_bytes(s, _class=_EmailMessage, policy=policy)
+        return cls.as_email_message(message)  # type: ignore
 
     @classmethod
-    def from_email_message(cls, message: PyEmailMessage):
-        to = [parseaddr(t.strip()) for t in message.get("To", "").split(",")]
-        from_ = parseaddr(message.get("From", ""))
-        subject = message.get("Subject", "")
-        body = message.get_body(("plain",))
-        html_body = message.get_body(("html",))
-        cc = [parseaddr(c.strip()) for c in message.get("Cc", "").split(",")]
-        reply_to = parseaddr(message.get("Reply-To", ""))
-        date = message.get("Date", None)
-        if date:
-            date = parsedate_to_datetime(date)
-        id = message.get("Message-ID")
+    def from_file(cls, fp: t.IO[str], policy: EmailPolicy = SMTP):
+        """Parse an email message from a file."""
+        message = message_from_file(fp, _class=_EmailMessage, policy=policy)
+        return cls.as_email_message(message)  # type: ignore
 
-        headers = {}
-        for name, value in message.items():
-            if name in (
-                "From",
-                "Subject",
-                "To",
-                "Cc",
-                "Reply-To",
-                "Date",
-                "Message-ID",
-            ):
-                continue
-            headers[name] = value
-
+    @classmethod
+    def from_email_message(cls, message: _EmailMessage):
+        """Parse an email message from an :class:`EmailMessage` object."""
         headers = dict(message.items())
+
+        to = EmailRecipients.parse(headers.pop("To", ""))
+        cc = EmailRecipients.parse(headers.pop("Cc", ""))
+        bcc = EmailRecipients.parse(headers.pop("Bcc", ""))
+
+        from_ = headers.pop("From", None)
+        if from_:
+            from_ = EmailRecipient.parse(from_)
+
+        reply_to = headers.pop("Reply-To", None)
+        if reply_to:
+            reply_to = EmailRecipient.parse(reply_to)
+
+        id = headers.pop("Message-ID", None)
+
+        date = headers.pop("Date", None)
+        if date:
+            date = dt.datetime.fromtimestamp(date)
+
+        subject = headers.pop("Subject", None)
+
+        body = message.get_body(preferencelist=("plain",))
+        if body:
+            body = body.get_payload()
+
+        amp_html_body = message.get_body(preferencelist=("x-amp-html",))
+        if amp_html_body:
+            amp_html_body = amp_html_body.get_payload()
+
+        html_body = message.get_body(preferencelist=("html",))
+        if html_body:
+            html_body = html_body.get_payload()
+
+        attachments = []
+        for part in message.iter_attachments():
+            attachment = EmailAttachment(
+                data=part.get_payload(),
+                mimetype=part.get_content_type(),
+                filename=part.get_filename(),
+                cid=part.get("Content-ID", None),
+                inline=part.get_content_disposition() == "inline",
+            )
+
+            attachments.append(attachment)
 
         return cls(
             to=to,
             subject=subject,
-            body=body and body.get_payload() or "",
-            html_body=html_body and html_body.get_payload() or None,
+            body=body,  # type: ignore
+            html_body=html_body,  # type: ignore
+            attachments=attachments,
             cc=cc,
-            reply_to=reply_to,
+            bcc=bcc,
             from_=from_,
-            headers=headers,
-            date=date,
+            reply_to=reply_to,
             id=id,
-            raw=message,
+            date=date,
+            headers=headers,
         )
 
     @classmethod
-    def from_file(cls, fp: t.IO[str]):
-        msg = message_from_file(fp, PyEmailMessage)
-        return cls.from_email_message(msg)  # type: ignore
-
-    @classmethod
     def from_string(cls, s: str):
-        msg = message_from_string(s, PyEmailMessage)
-        return cls.from_email_message(msg)  # type: ignore
+        """Parse an email message from a string."""
+        message = message_from_string(s, _class=_EmailMessage)
+        return cls.as_email_message(message)  # type: ignore
 
-    def verify(self):
-        """Verify the message integrity.
+    @property  # type: ignore[no-redef]
+    def to(self):
+        return self._to
 
-        Requires the `envelope` library to be installed.
-
-        :returns: message integrity verification
-        :rtype: bool
-
-        """
-        if not ENVELOPE_AVAILABLE:
-            raise RuntimeError("envelope library not available")
-
-        message = self.as_email_message()
-
-        env = envelope.Envelope.load(message)
-
-        sig = data = None
-        for part in message.walk():
-            if part.get_content_type() == "multipart/signed":
-                for subpart in part.walk():
-                    if (
-                        subpart.get_content_type()
-                        == "application/pgp-signature"
-                    ):
-                        sig = part.get_payload().encode()
-                    else:
-                        data = part.get_payload().encode()
-
-        if sig and data:
-            result = env._gpg_verify(sig, data)
-            self.verified = result
-            return result
-
-        return False
+    @to.setter
+    def to(self, value):
+        if type(value) is property:
+            value = EmailRecipients()
+        self._to = value
 
 
-class EmailMessageBuilder(UserDict):
-    """A builder for email messages.
+class EmailMessageBuilder(MessageBuilder):
+    r"""A fluent builder for email messages.
 
     :param to: A list of recipient addresses.
     :param subject: The email subject.
@@ -277,163 +345,130 @@ class EmailMessageBuilder(UserDict):
     :param from\\_: The from address of the email message.
     :param attachments: A list of attachments.
     :param headers: A list of additional messages headers.
-    :param service: Service to use for sending, reply etc.
 
     """
 
+    Message = EmailMessage
+
     def __init__(
         self,
-        to: t.Optional[AddressesType] = None,
+        to: t.Optional[EmailRecipientsType] = None,
         subject: t.Optional[str] = None,
         body: t.Optional[str] = None,
         html_body: t.Optional[str] = None,
         amp_html_body: t.Optional[str] = None,
-        cc: t.Optional[AddressesType] = None,
-        bcc: t.Optional[AddressesType] = None,
-        reply_to: t.Optional[AddressType] = None,
-        from_: t.Optional[AddressType] = None,
-        attachments: t.Optional[t.Iterable[EmailAttachment]] = None,
+        attachments: t.Optional[t.List[EmailAttachment]] = None,
+        cc: t.Optional[EmailRecipientsType] = None,
+        bcc: t.Optional[EmailRecipientsType] = None,
+        from_: t.Optional[EmailRecipientType] = None,
+        reply_to: t.Optional[EmailRecipientType] = None,
         headers: t.Optional[t.Dict[str, str]] = None,
-        encrypt: bool = False,
-        sign: bool = False,
-        service: t.Optional["Email"] = None,
     ):
-        self.service = service
+        data = {
+            "to": to,
+            "subject": subject,
+            "body": body,
+            "html_body": html_body,
+            "amp_html_body": amp_html_body,
+            "attachments": attachments,
+            "cc": cc,
+            "bcc": bcc,
+            "from_": from_,
+            "reply_to": reply_to,
+            "headers": headers,
+        }
 
-        super().__init__(
-            {
-                "to": to,
-                "subject": subject,
-                "body": body,
-                "cc": cc,
-                "bcc": bcc,
-                "headers": headers,
-                "html_body": html_body,
-                "amp_html_body": amp_html_body,
-                "reply_to": reply_to,
-                "from_": from_,
-                "attachments": attachments,
-                "encrypt": encrypt,
-                "sign": sign,
-            },
-        )
+        super().__init__(data)
 
-    def amp_html_body(self, amp_html_body: t.Optional[str] = None):
-        if not amp_html_body:
-            return self.data["amp_html_body"]
+    def as_bytes(self):
+        """Return the email message as a bytes."""
+        message = self.as_email_message()
+        return message.as_bytes()
 
-        return self.replace(amp_html_body=amp_html_body)
+    def as_email_message(self):
+        """Return the email message as a :class:`EmailMessage` object."""
+        message = _EmailMessage()
 
-    def as_message(self):
-        return EmailMessage(**self.data)
+        return message
+
+    def as_string(self):
+        """Return the email message as a string."""
+        message = self.as_email_message()
+        return message.as_string()
 
     def attach(
         self,
         data: t.Union[bytes, t.IO[bytes]],
-        filename: t.Optional[str] = None,
         mimetype: str = "application/octet-stream",
+        filename: t.Optional[str] = None,
+        cid: t.Optional[str] = None,
+        inline: bool = False,
     ):
-        """Attach a file to the message.
+        """Attach a file to the email message.
 
-        :param data: Bytes or file-like object contain attachment data.
-        :param filename: Filename of the attachment.
-        :param mimetype: Mimetype of the attachment, defaults to
-                         ``'application/octet-stream'``.
+        :param data: The attachment data.
+        :param mimetype: The mimetype, default `'application/octet-stream'`.
+        :param filename: The filename, optional.
+        :param cid: The Content-ID of the inline attachment, optional.
+        :param inline: Whether this is an inline attachment or not.
 
         """
+        attachments = self["attachments"].copy()
         attachment = EmailAttachment(
-            data,
-            filename=filename,
+            data=data,
             mimetype=mimetype,
+            filename=filename,
+            cid=cid,
+            inline=inline,
         )
-
-        attachments = self.attachments.copy()
         attachments.append(attachment)
 
-        return self.replace(attachments=attachments)
+        return self._replace(attachments=attachments)
 
-    @property
-    def attachments(self):
-        """List of email attachments."""
-        return self.data["attachments"]
+    def bcc(self, *recipients: EmailRecipientType):
+        """Add one or more Blind Carbon-Copy recipients."""
+        bcc = self["bcc"].copy()
+        bcc.extend(recipients)
 
-    def bcc(self, bcc: t.Optional[AddressesType] = None):
-        if not bcc:
-            return self.data["bcc"]
+        return self._replace(bcc=bcc)
 
-        return self.replace(bcc=bcc)
+    def cc(self, *recipients: EmailRecipientType):
+        """Add one or more Carbon-Copy recipients."""
+        cc = self["cc"].copy()
+        cc.extend(recipients)
 
-    def body(self, body: t.Optional[str] = None):
-        if not body:
-            return self.data["body"]
+        return self._replace(cc=cc)
 
-        return self.replace(body=body)
+    def from_(self, from_: EmailRecipientType):
+        """Set the From contact of the email message."""
+        return self._replace(from_=from_)
 
-    def cc(self, cc: t.Optional[AddressesType] = None):
-        if not cc:
-            return self.data["cc"]
+    def header(self, name: str, value: str):
+        """Set an email header.
 
-        return self.replace(cc=cc)
-
-    def from_(self, from_: t.Optional[AddressType] = None):
-        if not from_:
-            return self.data["from_"]
-
-        return self.replace(from_=from_)
-
-    def encrypt(self):
-        """Encrypt the message.
-
-        Requires the `envelope` library to be installed.
+        :param name: The email header name.
+        :param value: The email header value.
 
         """
-        if not ENVELOPE_AVAILABLE:
-            raise RuntimeError("envelope library not available")
+        headers = self["headers"].copy()
+        headers[name] = value
 
-    def html_body(self, html_body: t.Optional[str] = None):
-        if not html_body:
-            return self.data["html_body"]
+        return self._replace(headers=headers)
 
-        return self.replace(html_body=html_body)
+    def reply_to(self, recipient: EmailRecipientType):
+        """Set the Reply-To header of the email message."""
+        return self._replace(reply_to=recipient)
 
-    def replace(self, **kwargs):
-        data = self.data.copy()
-        data.update(kwargs)
+    def to(self, *recipients: EmailRecipientsType):
+        """Add one or more primary recipients."""
+        to = self["to"].copy()
+        to.extend(recipients)
 
-        return self.__class__(**data)
+        return self._replace(to=to)
 
-    def reply_to(self, reply_to: t.Optional[AddressesType] = None):
-        if not reply_to:
-            return self.data["reply_to"]
-
-        return self.replace(reply_to=reply_to)
-
-    def send(self):
-        """Send the email message."""
-        if not self.service:
-            raise NotImplementedError()
-        return self.service.send_message(self.format_message())
-
-    def sign(self):
-        """Sign the message.
-
-        Requires the `envelope` library to be installed.
-
-        """
-        if not ENVELOPE_AVAILABLE:
-            raise RuntimeError("envelope library not available")
-
-    def subject(self, subject: t.Optional[str] = None):
-        if not subject:
-            return self.data["subject"]
-
-        return self.replace(subject=subject)
-
-    def to(self, to: t.Optional[AddressesType] = None):
-        if not to:
-            return self.data["to"]
-
-        return self.replace(to=to)
+    def user_agent(self, user_agent: str):
+        """Set the User Agent on the email message."""
+        return self._replace(user_agent=user_agent)
 
 
 class Email(Service):
@@ -463,19 +498,19 @@ class Email(Service):
 
     def send(
         self,
-        to: AddressesType,
+        to: EmailRecipientsType,
         subject: str,
         body: str,
         html_body: t.Optional[str] = None,
         amp_html_body: t.Optional[str] = None,
-        cc: t.Optional[AddressesType] = None,
-        bcc: t.Optional[AddressesType] = None,
-        reply_to: t.Optional[AddressType] = None,
-        from_: t.Optional[AddressType] = None,
+        cc: t.Optional[EmailRecipientsType] = None,
+        bcc: t.Optional[EmailRecipientsType] = None,
+        reply_to: t.Optional[EmailRecipientType] = None,
+        from_: t.Optional[EmailRecipientType] = None,
         attachments: t.Optional[t.Iterable[EmailAttachment]] = None,
         headers: t.Optional[t.Dict[str, str]] = None,
     ):
-        """Send an email message.
+        r"""Send an email message.
 
         :param to: A list of recipient addresses.
         :param subject: The email subject.
