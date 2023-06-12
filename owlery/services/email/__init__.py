@@ -12,7 +12,13 @@ from email import (
 )
 from email.message import EmailMessage as _EmailMessage
 from email.policy import SMTP, EmailPolicy
-from email.utils import format_datetime, formataddr, make_msgid, parseaddr
+from email.utils import (
+    format_datetime,
+    formataddr,
+    make_msgid,
+    parseaddr,
+    parsedate,
+)
 
 from ... import __version__
 from .. import Attachment, Message, MessageBuilder, Service, ServiceManager
@@ -142,6 +148,15 @@ class EmailMessage(Message):
         message = self.as_email_message(policy=policy)
         return message.as_bytes(policy=policy)
 
+    def as_dict(self):
+        res = super().as_dict()
+
+        res.pop("_to")
+        res.pop("_cc")
+        res.pop("_bcc")
+
+        return res
+
     def as_email_message(self, policy: t.Optional[EmailPolicy] = None):
         """Return the email message as a :class:`EmailMessage` object."""
         message = _EmailMessage(policy=policy)
@@ -235,19 +250,19 @@ class EmailMessage(Message):
             _class=_EmailMessage,
             policy=policy,
         )
-        return cls.as_email_message(message)  # type: ignore
+        return cls.from_email_message(message)  # type: ignore
 
     @classmethod
     def from_bytes(cls, s: bytes, policy: EmailPolicy = SMTP):
         """Parse an email message from bytes."""
         message = message_from_bytes(s, _class=_EmailMessage, policy=policy)
-        return cls.as_email_message(message)  # type: ignore
+        return cls.from_email_message(message)  # type: ignore
 
     @classmethod
     def from_file(cls, fp: t.IO[str], policy: EmailPolicy = SMTP):
         """Parse an email message from a file."""
         message = message_from_file(fp, _class=_EmailMessage, policy=policy)
-        return cls.as_email_message(message)  # type: ignore
+        return cls.from_email_message(message)  # type: ignore
 
     @classmethod
     def from_email_message(cls, message: _EmailMessage):
@@ -270,7 +285,7 @@ class EmailMessage(Message):
 
         date = headers.pop("Date", None)
         if date:
-            date = dt.datetime.fromtimestamp(date)
+            date = parsedate(date)
 
         subject = headers.pop("Subject", None)
 

@@ -63,6 +63,9 @@ class Message:
     state: MessageState = MessageState.DRAFT
     service: t.Optional["Service"] = None
 
+    def as_dict(self):
+        return asdict(self)
+
     def send(self, service: t.Optional["Service"] = None):
         """Send the message.
 
@@ -466,7 +469,7 @@ class Service:
         :param message: A :class:`Message` message object.
 
         """
-        return self.send(asdict(message))
+        return self.send(**message.as_dict())
 
     def status_callback(self, request):
         """Receive sent message status callback from a webhook.
