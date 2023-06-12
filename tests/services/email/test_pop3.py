@@ -49,6 +49,8 @@ def pop3_message(docker_services, pop3_service, message):
             message.as_bytes(),
         )
 
+    time.sleep(5.0)
+
     return message
 
 
@@ -154,12 +156,8 @@ def test_specified_port():
 @pytest.mark.slow
 def test_receive(pop3, pop3_message):
     received_message = None
-    for _ in range(15):
-        for received_message in pop3.receive(limit=10):
-            received_message = received_message
-        if received_message:
-            break
-        time.sleep(1.0)
+    for received_message in pop3.receive(limit=10):
+        received_message = received_message
     pop3.close()
     assert received_message.subject == pop3_message.subject
 
@@ -169,12 +167,8 @@ def test_receive(pop3, pop3_message):
 def test_receive_contextmanager(pop3, pop3_message):
     received_message = None
     with pop3:
-        for _ in range(15):
-            for received_message in pop3.receive(limit=10):
-                received_message = received_message
-            if received_message:
-                break
-            time.sleep(1.0)
+        for received_message in pop3.receive(limit=10):
+            received_message = received_message
     assert received_message.subject == pop3_message.subject
 
 
@@ -182,12 +176,8 @@ def test_receive_contextmanager(pop3, pop3_message):
 @pytest.mark.slow
 def test_receive_with_manager(manager_with_pop3, pop3_message):
     received_message = None
-    for _ in range(15):
-        for received_message in manager_with_pop3.receive(limit=10):
-            received_message = received_message
-        if received_message:
-            break
-        time.sleep(1.0)
+    for received_message in manager_with_pop3.receive(limit=10):
+        received_message = received_message
     manager_with_pop3.close()
     assert received_message.subject == pop3_message.subject
 
@@ -196,10 +186,7 @@ def test_receive_with_manager(manager_with_pop3, pop3_message):
 @pytest.mark.slow
 def test_receive_with_manager_contextmanager(manager_with_pop3, pop3_message):
     received_message = None
-    for _ in range(15):
+    with manager_with_pop3:
         for received_message in manager_with_pop3.receive(limit=10):
             received_message = received_message
-        if received_message:
-            break
-        time.sleep(1.0)
     assert received_message.subject == pop3_message.subject
