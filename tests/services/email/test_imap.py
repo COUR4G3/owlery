@@ -2,12 +2,9 @@ import imaplib
 import socket
 import time
 
-from email.utils import make_msgid
-
 import pytest
 
 from owlery.exceptions import ServiceAuthFailed
-from owlery.services.email import EmailMessage
 from owlery.services.email.imap import IMAP
 
 
@@ -17,7 +14,7 @@ def check_imap(host, port):
         sock.recv(1)
     except (OSError, socket.timeout):
         return False
-    finally:
+    else:
         sock.close()
 
     return True
@@ -37,16 +34,8 @@ def imap_service(docker_ip, docker_services):
 
 
 @pytest.fixture()
-def message(imap_service):
+def imap_message(imap_service, message):
     host, port = imap_service
-
-    message = EmailMessage(
-        to=["user"],
-        subject="Test message",
-        body="This is a test message.",
-        from_="test@example.com",
-        id=make_msgid(),
-    )
 
     with imaplib.IMAP4(host=host, port=port) as imap:
         imap.login("user", "pass")
@@ -157,32 +146,32 @@ def test_specified_port():
 
 
 @pytest.mark.integration
-def test_receive(imap, message):
+def test_receive(imap, imap_message):
     for received_message in imap.receive(limit=10):
         received_message = received_message
     imap.close()
-    assert received_message.id == message.id
+    assert received_message.id == imap_message.id
 
 
 @pytest.mark.integration
-def test_receive_contextmanager(imap, message):
+def test_receive_contextmanager(imap, imap_message):
     with imap:
         for received_message in imap.receive(limit=10):
             received_message = received_message
-    assert received_message.id == message.id
+    assert received_message.id == imap_message.id
 
 
 @pytest.mark.integration
-def test_receive_with_manager(manager_with_imap, message):
+def test_receive_with_manager(manager_with_imap, imap_message):
     for received_message in manager_with_imap.receive(limit=10):
         received_message = received_message
     manager_with_imap.close()
-    assert received_message.id == message.id
+    assert received_message.id == imap_message.id
 
 
 @pytest.mark.integration
-def test_receive_with_manager_contextmanager(manager_with_imap, message):
+def test_receive_with_manager_contextmanager(manager_with_imap, imap_message):
     with manager_with_imap:
         for received_message in manager_with_imap.receive(limit=10):
             received_message = received_message
-    assert received_message.id == message.id
+    assert received_message.id == imap_message.id

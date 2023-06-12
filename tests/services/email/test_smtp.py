@@ -12,7 +12,7 @@ def check_smtp(host, port):
         sock.recv(1)
     except (OSError, socket.timeout):
         return False
-    finally:
+    else:
         sock.close()
 
     return True
@@ -32,18 +32,9 @@ def smtp_service(docker_ip, docker_services):
 
 
 @pytest.fixture(scope="session")
-def message():
-    return {
-        "body": "This is a test message",
-        "from_": "test@example.com",
-        "subject": "Test message",
-        "to": ["test@example.com"],
-    }
-
-
-@pytest.fixture(scope="session")
-def smtp():
-    return SMTP(host="localhost", port=25, user="test", password="test")
+def smtp(smtp_service):
+    host, port = smtp_service
+    return SMTP(host=host, port=port, user="test", password="test")
 
 
 @pytest.fixture
@@ -141,23 +132,23 @@ def test_connect_wrong_credentials(docker_ip, docker_services):
 
 @pytest.mark.integration
 def test_send(smtp, message):
-    smtp.send(**message)
+    smtp.send_message(message)
     smtp.close()
 
 
 @pytest.mark.integration
 def test_send_contextmanager(smtp, message):
     with smtp:
-        smtp.send(**message)
+        smtp.send_message(message)
 
 
 @pytest.mark.integration
 def test_send_with_manager(manager_with_smtp, message):
-    manager_with_smtp.send(**message)
+    manager_with_smtp.send_message(message)
     manager_with_smtp.close()
 
 
 @pytest.mark.integration
 def test_send_with_manager_contextmanager(manager_with_smtp, message):
     with manager_with_smtp:
-        manager_with_smtp.send(**message)
+        manager_with_smtp.send_message(message)

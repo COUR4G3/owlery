@@ -1,12 +1,10 @@
 import imaplib
-import secrets
 import socket
 import time
 
 import pytest
 
 from owlery.exceptions import ServiceAuthFailed
-from owlery.services.email import EmailMessage
 from owlery.services.email.pop3 import POP3
 
 
@@ -17,7 +15,7 @@ def check_pop3(host, port):
         sock.recv(1)
     except (OSError, socket.timeout):
         return False
-    finally:
+    else:
         sock.close()
 
     return True
@@ -37,22 +35,9 @@ def pop3_service(docker_ip, docker_services):
 
 
 @pytest.fixture()
-def message(docker_services, pop3_service):
+def pop3_message(docker_services, pop3_service, message):
     host = pop3_service[0]
     port = docker_services.port_for("pop3", 143)
-
-    docker_services.wait_until_responsive(
-        timeout=30.0,
-        pause=0.1,
-        check=lambda: check_pop3(host, port),
-    )
-
-    message = EmailMessage(
-        to=["user"],
-        subject=f"Test message {secrets.token_hex(8)}",
-        body="This is a test message.",
-        from_="test@example.com",
-    )
 
     with imaplib.IMAP4(host=host, port=port) as imap:
         imap.login("user", "pass")
