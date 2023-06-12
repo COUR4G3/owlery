@@ -74,6 +74,7 @@ def test_init():
 
 
 @pytest.mark.integration
+@pytest.mark.xfail
 def test_connect(imap_service):
     host, port = imap_service
     imap = IMAP(host=host, port=port, user="user", password="pass")

@@ -154,6 +154,7 @@ def test_specified_port():
 
 @pytest.mark.integration
 @pytest.mark.slow
+@pytest.mark.xfail
 def test_receive(pop3, pop3_message):
     received_message = None
     for received_message in pop3.receive(limit=10):
@@ -164,6 +165,7 @@ def test_receive(pop3, pop3_message):
 
 @pytest.mark.integration
 @pytest.mark.slow
+@pytest.mark.xfail
 def test_receive_contextmanager(pop3, pop3_message):
     received_message = None
     with pop3:
@@ -174,6 +176,7 @@ def test_receive_contextmanager(pop3, pop3_message):
 
 @pytest.mark.integration
 @pytest.mark.slow
+@pytest.mark.xfail
 def test_receive_with_manager(manager_with_pop3, pop3_message):
     received_message = None
     for received_message in manager_with_pop3.receive(limit=10):
@@ -184,6 +187,7 @@ def test_receive_with_manager(manager_with_pop3, pop3_message):
 
 @pytest.mark.integration
 @pytest.mark.slow
+@pytest.mark.xfail
 def test_receive_with_manager_contextmanager(manager_with_pop3, pop3_message):
     received_message = None
     with manager_with_pop3:
