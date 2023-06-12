@@ -10,7 +10,7 @@ from owlery.services.email import EmailManager, EmailMessage, EmailRecipient
 
 def generate_name():
     return random.choice(
-        [factory.Faker("name"), factory.Faker("user_name"), None],
+        [str(factory.Faker("name")), str(factory.Faker("user_name")), None],
     )
 
 
