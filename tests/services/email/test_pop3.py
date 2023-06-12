@@ -49,7 +49,7 @@ def pop3_message(docker_services, pop3_service, message):
             message.as_bytes(),
         )
 
-    time.sleep(5.0)  # dovecot takes a few seconds to put this is POP3 mailbox
+    time.sleep(15.0)  # dovecot takes a few seconds to put this is POP3 mailbox
 
     return message
 
