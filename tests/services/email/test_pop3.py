@@ -49,6 +49,8 @@ def pop3_message(docker_services, pop3_service, message):
             message.as_bytes(),
         )
 
+    time.sleep(2.0)  # dovecot takes a few seconds to put this is POP3 mailbox
+
     return message
 
 
@@ -150,36 +152,40 @@ def test_specified_port():
 
 
 @pytest.mark.integration
-def test_receive(pop3, message):
+@pytest.mark.slow
+def test_receive(pop3, pop3_message):
     received_message = None
     for received_message in pop3.receive(limit=10):
         received_message = received_message
     pop3.close()
-    assert received_message.subject == message.subject
+    assert received_message.subject == pop3_message.subject
 
 
 @pytest.mark.integration
-def test_receive_contextmanager(pop3, message):
+@pytest.mark.slow
+def test_receive_contextmanager(pop3, pop3_message):
     received_message = None
     with pop3:
         for received_message in pop3.receive(limit=10):
             received_message = received_message
-    assert received_message.subject == message.subject
+    assert received_message.subject == pop3_message.subject
 
 
 @pytest.mark.integration
-def test_receive_with_manager(manager_with_pop3, message):
+@pytest.mark.slow
+def test_receive_with_manager(manager_with_pop3, pop3_message):
     received_message = None
     for received_message in manager_with_pop3.receive(limit=10):
         received_message = received_message
     manager_with_pop3.close()
-    assert received_message.subject == message.subject
+    assert received_message.subject == pop3_message.subject
 
 
 @pytest.mark.integration
-def test_receive_with_manager_contextmanager(manager_with_pop3, message):
+@pytest.mark.slow
+def test_receive_with_manager_contextmanager(manager_with_pop3, pop3_message):
     received_message = None
     with manager_with_pop3:
         for received_message in manager_with_pop3.receive(limit=10):
             received_message = received_message
-    assert received_message.subject == message.subject
+    assert received_message.subject == pop3_message.subject
