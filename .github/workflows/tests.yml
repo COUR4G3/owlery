@@ -86,7 +86,7 @@ jobs:
       - name: Setup test suite
         run: tox r -e py${{ matrix.python }} -vv --notest
       - name: Run test suite
-        run: tox r -e py${{ matrix.python }} --skip-pkg-install -- --integration
+        run: tox r -e py${{ matrix.python }} --skip-pkg-install -- --integration --slow
       - name: Publish coveralls.io
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
