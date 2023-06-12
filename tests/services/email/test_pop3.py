@@ -116,10 +116,11 @@ def test_connect_starttls(pop3_service):
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_connect_wrong_credentials(pop3):
+def test_connect_wrong_credentials(pop3_service):
+    host, port = pop3_service
     pop3 = POP3(
-        host="localhost",
-        port=110,
+        host=host,
+        port=port,
         user="user",
         password="wrong",
         starttls=True,
