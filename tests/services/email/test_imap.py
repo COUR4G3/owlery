@@ -11,6 +11,7 @@ from owlery.services.email.imap import IMAP
 def check_imap(host, port):
     try:
         sock = socket.create_connection((host, port), timeout=5.0)
+        sock.send(b"\0")
         sock.recv(1)
     except (OSError, socket.timeout):
         return False
