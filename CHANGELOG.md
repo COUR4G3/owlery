@@ -10,6 +10,12 @@ in the ``changelog.d/`` folder.
 
 <!-- towncrier release notes start -->
 
+## [0.3.0](https://github.com/COUR4G3/owlery/tree/0.2.0) - 2023-07-15
+
+
+- Refactored various APIs and methods.
+
+
 ## [0.2.0](https://github.com/COUR4G3/owlery/tree/0.2.0) - 2023-06-07
 
 
