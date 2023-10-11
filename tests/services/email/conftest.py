@@ -3,14 +3,17 @@ import random
 from email.utils import make_msgid
 
 import factory
+import faker
 import pytest
 
 from owlery.services.email import EmailManager, EmailMessage, EmailRecipient
 
+fake = faker.Faker()
+
 
 def generate_name():
     return random.choice(
-        [str(factory.Faker("name")), str(factory.Faker("user_name")), None],
+        [fake.name(), fake.user_name(), None],
     )
 
 
@@ -24,11 +27,11 @@ class EmailRecipientFactory(factory.Factory):
 
 def generate_msgid():
     level = random.randint(0, 2)
-    return make_msgid(domain=factory.Faker("hostname", level=level))
+    return make_msgid(domain=fake.hostname(level=level))
 
 
 def generate_recipient():
-    return random.choice([EmailRecipientFactory(), factory.Faker("email")])
+    return random.choice([EmailRecipientFactory(), fake.email()])
 
 
 def generate_recipients(min=1, max=3):
