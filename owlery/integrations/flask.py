@@ -1,10 +1,10 @@
-import importlib
 import typing as t
 
 from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
 from ..services import Service, ServiceManager
+from ..utils import import_service_class
 
 
 class Owlery:
@@ -123,9 +123,7 @@ class Owlery:
             raise RuntimeError(f"Service '{name}' is not configured")
 
         if isinstance(class_, str):
-            module_name, class_name = class_.rsplit(".", 1)
-            module = importlib.import_module(module_name)
-            class_ = getattr(module, class_name)
+            class_ = import_service_class(class_)
 
         service = class_(name=name, **options)
 
@@ -140,9 +138,7 @@ class Owlery:
             for service_name in service_names:
                 service_cls = options.pop(f"{service_name}_cls")
                 if isinstance(service_cls, str):
-                    module_name, class_name = service_cls.rsplit(".", 1)
-                    module = importlib.import_module(module_name)
-                    service_cls = getattr(module, class_name)
+                    service_cls = import_service_class(service_cls)
 
                 service_opts = {
                     k.removeprefix(f"{service_name}_"): v
