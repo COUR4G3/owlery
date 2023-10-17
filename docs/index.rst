@@ -42,7 +42,7 @@ evolution - even sending different messages through different vendors based on r
    contributing
    changelog
    license
-   recipes
+   recipes/index
 
 
 .. toctree::

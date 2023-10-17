@@ -7,10 +7,10 @@ Integrate messaging in your Flask application and configure messaging managers a
 :doc:`configuration handling <flask:config>`.
 
 
-Initializing the extension
+Initialising the extension
 --------------------------
 
-To initialize the integration, instantiate the :class:`Owlery` class and pass the ``app`` instance:
+To initialise the integration, instantiate the :class:`Owlery` class and pass the ``app`` instance:
 
 .. autoclass:: Owlery
 

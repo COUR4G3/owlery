@@ -1,5 +1,5 @@
 Celery
 ======
 
-.. literalinclude:: ../owlery/examples/celery.py
+.. literalinclude:: ../../owlery/examples/queue_manager.py
   :language: Python

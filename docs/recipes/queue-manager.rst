@@ -1,5 +1,5 @@
 Queue Manager
 =============
 
-.. literalinclude:: ../owlery/examples/queue_manager.py
+.. literalinclude:: /../owlery/examples/queue_manager.py
   :language: Python
